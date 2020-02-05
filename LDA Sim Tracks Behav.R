@@ -4,7 +4,6 @@
 
 setwd("~/Documents/Snail Kite Project/Data/R Scripts/ValleLabUF/git_LDA_behavior")
 
-set.seed(1)
 
 library('MCMCpack')
 library('Rcpp')

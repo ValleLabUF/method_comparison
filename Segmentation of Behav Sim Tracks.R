@@ -4,7 +4,6 @@
 
 setwd("~/Documents/Snail Kite Project/Data/R Scripts/ValleLabUF/git_segmentation_behavior")
 
-set.seed(2)
 
 library(tidyverse)
 library(tictoc)
@@ -37,7 +36,7 @@ angle.bin.lims=seq(from=-pi, to=pi, by=pi/4)  #8 bins
 
 max.dist=max(dat[dat$dt == 3600,]$dist, na.rm = T)
 upper90.thresh=as.numeric(quantile(dat[dat$dt == 3600,]$dist, 0.90, na.rm=T)) 
-dist.bin.lims=seq(from=0, to=upper90.thresh, length.out = 5)
+dist.bin.lims=seq(from=0, to=upper90.thresh, length.out = 6)
 dist.bin.lims=c(dist.bin.lims, max.dist)  #6 bins
 
 #assign bins to obs
@@ -57,6 +56,8 @@ behav.list2<- lapply(behav.list, function(x) subset(x, select = c(id, SL, TA))) 
 alpha = 1
 
 ngibbs = 40000
+
+plan(multisession)
 dat.res<- behavior_segment(data = behav.list2, ngibbs = ngibbs, nbins = c(6,8), alpha = alpha)
 #takes 9 min for 40000 iterations
 

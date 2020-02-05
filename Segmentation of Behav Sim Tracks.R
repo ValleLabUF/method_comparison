@@ -24,16 +24,16 @@ dat<- read.csv("CRW_HC_sim.csv", as.is = T)  #for hard-clustering sim
 # dat<- read.csv("CRW_MM_sim.csv", as.is = T)  #for mixed-membership sim
 dat$dt<- 3600
 dat$id<- 1
-
 dat.list<- df.to.list(dat=dat)
 names(dat)[3:4]<- c("dist","rel.angle")
 
 #filter data for tstep of interest
 behav.list<- behav.prep(dat=dat, tstep = 3600)  #add move params and filter by 3600 s interval
 
-#define bin number and limits for step lengths and turning angles
+#define bin number and limits for turning angles
 angle.bin.lims=seq(from=-pi, to=pi, by=pi/4)  #8 bins
 
+#define bin number and limits for step lengths
 max.dist=max(dat[dat$dt == 3600,]$dist, na.rm = T)
 upper90.thresh=as.numeric(quantile(dat[dat$dt == 3600,]$dist, 0.90, na.rm=T)) 
 dist.bin.lims=seq(from=0, to=upper90.thresh, length.out = 6)
@@ -72,7 +72,7 @@ traceplot(data = dat.res$LML, type = "LML", identity = identity)
 
 ##Determine maximum likelihood (ML) for selecting breakpoints
 ML<- apply(dat.res$LML, 1, function(x) getML(dat = x, nburn = 500))
-brkpts<- getBreakpts(dat = dat.res$brkpts, ML = ML, brk.cols = 99)  #brk.cols is max matrix cols
+brkpts<- getBreakpts(dat = dat.res$brkpts, ML = ML)
 
 ## Heatmaps
 plot.heatmap(data = behav.list, nbins = c(6,8), brkpts = brkpts, dat.res = dat.res, type = "behav")

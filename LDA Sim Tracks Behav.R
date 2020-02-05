@@ -38,6 +38,10 @@ nburn=ngibbs/2
 nmaxclust=max(nbins) - 1  #one fewer than max number of bins used for params
 ndata.types=length(nbins)
 
+#prior
+gamma1=0.1
+alpha=0.1
+
 #run Gibbs sampler
 res=LDA_behavior_gibbs(dat=obs, gamma1=gamma1, alpha=alpha,
                        ngibbs=ngibbs, nmaxclust=nmaxclust,

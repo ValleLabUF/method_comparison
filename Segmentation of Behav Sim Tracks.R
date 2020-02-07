@@ -12,9 +12,9 @@ library(viridis)
 library(lubridate)
 
 
-source('gibbs functions2.R')
+source('gibbs functions.R')
 source('helper functions.R')
-source('gibbs sampler2.R')
+source('gibbs sampler.R')
 
 
 setwd("~/Documents/Snail Kite Project/Data/R Scripts/ValleLabUF/method_comparison")
@@ -59,7 +59,7 @@ ngibbs = 40000
 
 plan(multisession)
 dat.res<- behavior_segment(data = behav.list2, ngibbs = ngibbs, nbins = c(6,8), alpha = alpha)
-#takes 9 min for 40000 iterations
+#takes 10 min for 40000 iterations
 
 
 ## Traceplots
@@ -72,7 +72,7 @@ traceplot(data = dat.res$LML, type = "LML", identity = identity)
 
 ##Determine maximum likelihood (ML) for selecting breakpoints
 ML<- apply(dat.res$LML, 1, function(x) getML(dat = x, nburn = 500))
-brkpts<- getBreakpts(dat = dat.res$brkpts, ML = ML)
+brkpts<- getBreakpts(dat = dat.res$brkpts, ML = ML, identity = identity)
 
 ## Heatmaps
 plot.heatmap(data = behav.list, nbins = c(6,8), brkpts = brkpts, dat.res = dat.res, type = "behav")
@@ -86,11 +86,46 @@ all.brkpts<- data.frame(brks = c(true.brkpts, model.brkpts), type = rep(c("True"
                                                                         c(length(true.brkpts),
                                                                           length(model.brkpts))))
 
-ggplot(all.brkpts, aes(x=brks, y=type)) +
-  geom_point(size=2) +
+accuracy<- matrix(NA,length(model.brkpts),1)
+for (i in 1:length(model.brkpts)) {
+  
+  tmp<- c(model.brkpts[i] - (10:0), model.brkpts[i] + (1:10)) %in% true.brkpts %>% sum()
+  
+  if (tmp == 0) {
+    accuracy[i]<- "Inaccurate"
+  } else {
+    accuracy[i]<- "Accurate"
+  }
+}
+
+if (sum(abs(diff(model.brkpts)) < 10) >= 0) {
+  ind<- which(abs(diff(model.brkpts)) <= 10)
+  ind<- sort(c(ind, ind+1))
+}
+
+ind.acc<- ind[which(accuracy[ind] == "Accurate")]
+ind.inacc<- ind[which(accuracy[ind] == "Inaccurate")]
+accuracy[ind.acc]<- "Accurate Duplicate"
+accuracy[ind.inacc]<- "Inaccurate Duplicate"
+accuracy<- c(rep("True",length(true.brkpts)), accuracy)
+
+all.brkpts$acc<- accuracy
+
+#for hard-clustering
+ggplot(all.brkpts, aes(x=brks, y=type, color = acc)) +
+  geom_point(size=3) +
   theme_bw() +
   labs(x="Time", y="Type") +
-  theme(axis.title = element_text(size = 16), axis.text = element_text(size = 10))
+  theme(axis.title = element_text(size = 16), axis.text = element_text(size = 10), legend.position = "top") +
+  scale_color_manual("Accuracy", values = c("forestgreen","lightgreen","firebrick","black"))
+
+# #for mixed-membership
+# ggplot(all.brkpts, aes(x=brks, y=type, color = acc)) +
+#   geom_point(size=3) +
+#   theme_bw() +
+#   labs(x="Time", y="Type") +
+#   theme(axis.title = element_text(size = 16), axis.text = element_text(size = 10), legend.position = "top") +
+#   scale_color_manual("Accuracy", values = c("forestgreen","lightgreen","firebrick","salmon","black"))
 
 dat_out<- map(behav.list, assign.time.seg, brkpts = brkpts) %>% map_dfr(`[`)  #assign time seg and make as DF
 

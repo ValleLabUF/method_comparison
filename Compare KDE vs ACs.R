@@ -11,14 +11,14 @@ library(sf)
 library(lubridate)
 
 
-dat<- read.csv("Snail Kite Gridded Data_AC.csv", as.is = TRUE)
+dat<- read.csv("Snail Kite Gridded Data_AC_TOHO.csv", as.is = TRUE)
 
 
 ###################
 ### Modeled ACs ###
 ###################
 
-ac.coords<- read.csv("Activity Center Coordinates.csv", header = T, sep = ',')
+ac.coords<- read.csv("Activity Center Coordinates_TOHO.csv", header = T, sep = ',')
 
 ## Map
 
@@ -42,9 +42,9 @@ ggplot() +
   geom_sf(data = lakes10, fill = "lightblue", alpha = 0.65) +
   coord_sf(xlim = c(min(dat$x-20000), max(dat$x+20000)),
            ylim = c(min(dat$y-20000), max(dat$y+20000)), expand = FALSE) +
-  geom_point(data = dat, aes(x, y, fill = "Raw"), color = "grey55", shape = 21, size = 1,
+  geom_point(data = dat, aes(x, y, fill = "Raw"), shape = 21, size = 1,
              alpha = 0.2) +
-  geom_point(data = nests, aes(x, y, fill = "Nests"), shape = 24, size = 2.5, alpha = 0.7) +
+  geom_point(data = nests, aes(x, y, fill = "Nests"), shape = 24, size = 3.5, alpha = 0.7) +
   geom_point(data = ac.coords, aes(x, y, fill = "ACs"), shape = 21, size = 3, alpha = 0.8) +
   labs(x="Longitude", y="Latitude") +
   scale_fill_manual("", values = c(viridis(n=3)[1],"red","grey55")) +
@@ -97,11 +97,35 @@ ggplot() +
         axis.text.y = element_text(size = 12),
         axis.text.x = element_text(size = 14),
         panel.grid = element_blank()) +
-  scale_y_continuous(breaks = 1:20)
+  scale_y_continuous(breaks = 1:20, trans = "reverse")
 
 
+## AC Heatmap by month and year
 
+dat2<- dat2 %>% mutate(month = lubridate::month(date), year = lubridate::year(date))
+dat.sum<- dat2 %>% group_by(year, month, ac) %>% tally() %>% group_by(year, month) %>%
+  mutate(N=sum(n)) %>% mutate(prop = n/N)
+dat.sum$date<- as.Date(paste0(dat.sum$year,"-", dat.sum$month,"-01"), "%Y-%m-%d")
 
+foo<- matrix(0, 20*length(unique(dat.sum$date)), 3)
+colnames(foo)<- c("date","ac","prop")
+foo[,1]<- rep(unique(dat.sum$date), each=20)
+foo[,2]<- rep(1:20, length(unique(dat.sum$date)))
+for (i in 1:nrow(dat.sum)) {
+  ind<- which(dat.sum$date[i] == foo[,1] & dat.sum$ac[i] == foo[,2])
+foo[ind,3]<- dat.sum$prop[i]
+}
+foo<- data.frame(foo)
+
+ggplot(data = foo, aes(x=lubridate::as_date(date), y=ac)) +
+  geom_tile(aes(fill=prop), width = 31) +
+  scale_fill_viridis_c("Proportion of\nObservations\nper Month") +
+  scale_y_continuous(trans = "reverse", breaks = 1:20, expand = c(0,0)) +
+  scale_x_date(date_labels = "%b %Y", expand = c(0,0)) +
+  labs(x="Time", y="Activity Center") +
+  theme_bw() +
+  theme(panel.grid = element_blank(), axis.title = element_text(size = 16),
+        axis.text = element_text(size = 12))
 
 
 ### KDE (by season)

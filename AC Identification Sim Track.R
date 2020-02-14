@@ -26,6 +26,8 @@ setwd("~/Documents/Snail Kite Project/Data/R Scripts/ValleLabUF/method_compariso
 #load data
 dat<- read.csv("BRW_tsegs.csv", as.is = TRUE)
 obs<- get.summary.stats_obs(dat)  #frequency of visitation in each location (column) for each time segment (row)
+obs1<- as.matrix(obs[,-1])  #for proper use by model
+
 
 #geographical coordinates of locations
 grid<- raster(extent(min(dat$x), max(dat$x), min(dat$y), max(dat$y)) + 5)
@@ -63,7 +65,7 @@ gamma1=0.1
 #run gibbs sampler
 options(warn=2)
 
-res=gibbs.activity.center(dat=obs[,-1],grid.coord=grid.coord[,-3],n.ac=n.ac,
+res=gibbs.activity.center(dat=obs1,grid.coord=grid.coord[,-3],n.ac=n.ac,
                           ac.coord.init=ac.coord.init[,-3],gamma1=gamma1,
                           possib.ac=possib.ac[,-3])
 

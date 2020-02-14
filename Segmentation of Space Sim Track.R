@@ -203,7 +203,7 @@ all.brkpts<- data.frame(brks = c(true.brkpts, model.brkpts), type = rep(c("True"
 accuracy<- matrix(NA,length(model.brkpts),1)
 for (i in 1:length(model.brkpts)) {
   
-  tmp<- c(model.brkpts[i] - (10:0), model.brkpts[i] + (1:10)) %in% true.brkpts %>% sum()
+  tmp<- c(model.brkpts[i] - (20:0), model.brkpts[i] + (1:20)) %in% true.brkpts %>% sum()
   
   if (tmp == 0) {
     accuracy[i]<- "Inaccurate"
@@ -212,8 +212,8 @@ for (i in 1:length(model.brkpts)) {
   }
 }
 
-if (sum(abs(diff(model.brkpts)) <= 10) > 0) {
-  ind<- which(abs(diff(model.brkpts)) <= 10)
+if (sum(abs(diff(model.brkpts)) <= 20) > 0) {
+  ind<- which(abs(diff(model.brkpts)) <= 20)
   ind<- sort(c(ind, ind+1))
 }
 

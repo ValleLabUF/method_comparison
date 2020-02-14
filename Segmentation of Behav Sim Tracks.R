@@ -89,7 +89,7 @@ all.brkpts<- data.frame(brks = c(true.brkpts, model.brkpts), type = rep(c("True"
 accuracy<- matrix(NA,length(model.brkpts),1)
 for (i in 1:length(model.brkpts)) {
   
-  tmp<- c(model.brkpts[i] - (10:0), model.brkpts[i] + (1:10)) %in% true.brkpts %>% sum()
+  tmp<- c(model.brkpts[i] - (20:0), model.brkpts[i] + (1:20)) %in% true.brkpts %>% sum()
   
   if (tmp == 0) {
     accuracy[i]<- "Inaccurate"
@@ -98,8 +98,8 @@ for (i in 1:length(model.brkpts)) {
   }
 }
 
-if (sum(abs(diff(model.brkpts)) < 10) >= 0) {
-  ind<- which(abs(diff(model.brkpts)) <= 10)
+if (sum(abs(diff(model.brkpts)) < 20) >= 0) {
+  ind<- which(abs(diff(model.brkpts)) <= 20)
   ind<- sort(c(ind, ind+1))
 }
 
@@ -109,7 +109,27 @@ accuracy[ind.acc]<- "Accurate Duplicate"
 accuracy[ind.inacc]<- "Inaccurate Duplicate"
 accuracy<- c(rep("True",length(true.brkpts)), accuracy)
 
+
+#identify missing breakpoints from model
+status<- matrix(NA,length(true.brkpts),1)
+for (i in 1:length(true.brkpts)) {
+  
+  tmp<- c(true.brkpts[i] - (20:0), true.brkpts[i] + (1:20)) %in% model.brkpts %>% sum()
+  
+  if (tmp == 0) {
+    status[i]<- "Missing"
+  } else {
+    status[i]<- "Present"
+  }
+}
+
+miss.ind<- which(status =="Missing")
+status.miss<- data.frame(brks = true.brkpts[miss.ind], type = rep("Model", length(miss.ind)),
+                         acc = rep("Missing", length(miss.ind)))
+
+
 all.brkpts$acc<- accuracy
+all.brkpts<- rbind(all.brkpts, status.miss)
 
 #for hard-clustering
 ggplot(all.brkpts, aes(x=brks, y=type, color = acc)) +
@@ -120,12 +140,14 @@ ggplot(all.brkpts, aes(x=brks, y=type, color = acc)) +
   scale_color_manual("Accuracy", values = c("forestgreen","lightgreen","firebrick","black"))
 
 # #for mixed-membership
-# ggplot(all.brkpts, aes(x=brks, y=type, color = acc)) +
+# ggplot(all.brkpts, aes(x=brks, y=type, color = acc, shape = acc)) +
 #   geom_point(size=3) +
 #   theme_bw() +
 #   labs(x="Time", y="Type") +
-#   theme(axis.title = element_text(size = 16), axis.text = element_text(size = 10), legend.position = "top") +
-#   scale_color_manual("Accuracy", values = c("forestgreen","lightgreen","firebrick","salmon","black"))
+#   theme(axis.title = element_text(size = 16), axis.text = element_text(size = 10),
+#         legend.position = "top") +
+#   scale_color_manual("Accuracy", values = c("forestgreen","lightgreen","firebrick","black")) +
+#   scale_shape_manual("Accuracy", values = c(16,16,4,16))
 
 dat_out<- map(behav.list, assign.time.seg, brkpts = brkpts) %>% map_dfr(`[`)  #assign time seg and make as DF
 

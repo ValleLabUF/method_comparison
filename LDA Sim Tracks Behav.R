@@ -83,7 +83,8 @@ theta.estim<- apply(theta.estim[,1:3], 1, function(x) x/sum(x)) %>% t()  #normal
 theta.estim<- data.frame(id = obs$id, tseg = obs$tseg, theta.estim)
 
 #DEFINE BEHAVIOR ORDER BASED ON HISTOGRAMS
-names(theta.estim)<- c("id", "tseg","Resting","Exploratory","Transit")  
+names(theta.estim)<- c("id", "tseg","Resting","Exploratory","Transit")  #for HC CRW
+# names(theta.estim)<- c("id", "tseg","Exploratory","Resting","Transit")  #for MM CRW
 nobs<- data.frame(id = obs$id, tseg = obs$tseg, n = apply(obs[,3:8], 1, sum)) #calc obs per tseg using SL bins (more reliable than TA)
 
 #Create augmented matrix by replicating rows (tsegs) according to obs per tseg
@@ -130,6 +131,8 @@ names(true.behavior.long)[2:3]<- c("behavior","prop")
 true.behavior.long$behavior<- factor(true.behavior.long$behavior,
                                      levels = c("Resting","Exploratory","Transit"))
 
+
+#Plot overlapping traces
 ggplot(theta.estim.long) +
   geom_line(aes(x=time1, y=prop, color = behavior), size = 1) +
   geom_line(data = true.behavior.long, aes(x=time1, y=prop, color=behavior), size = 0.5) +
@@ -139,6 +142,17 @@ ggplot(theta.estim.long) +
   theme(axis.title = element_text(size = 16), axis.text.y = element_text(size = 14),
         axis.text.x.bottom = element_text(size = 12)) +
   facet_wrap(~behavior)
+
+#Plot scatterplot and compare to 1:1 line
+# scatter.prop.comp<- data.frame(behavior = theta.estim.long$behavior,
+#                                prop.estim = theta.estim.long$prop,
+#                                prop.true = true.behavior.long$prop)
+# 
+# ggplot(scatter.prop.comp, aes(prop.estim, prop.true, color = behavior)) +
+#   geom_point(size = 3, alpha = 0.5) +
+#   geom_abline(slope = 1, intercept = 0) +
+#   theme_bw() +
+#   facet_wrap(~behavior)
 
 
 #assign  behavior from sim to data

@@ -149,6 +149,14 @@ ggplot(all.brkpts, aes(x=brks, y=type, color = acc)) +
 #   scale_color_manual("Accuracy", values = c("forestgreen","lightgreen","firebrick","black")) +
 #   scale_shape_manual("Accuracy", values = c(16,16,4,16))
 
+
+## Calculate percentage of each measure of breakpoint accuracy for summary
+
+all.brkpts %>% filter(type == "Model") %>% group_by(acc) %>% summarise(n=n()) %>%
+  mutate(freq = n/sum(n))
+
+
+
 dat_out<- map(behav.list, assign.time.seg, brkpts = brkpts) %>% map_dfr(`[`)  #assign time seg and make as DF
 
 

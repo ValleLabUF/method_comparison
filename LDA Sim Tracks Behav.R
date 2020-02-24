@@ -176,6 +176,32 @@ ggplot() +
   coord_equal()
 
 
+
+
+
+
+## Calc MSE fro behav-specific prop over time (values for MM CRW sim)
+
+#create joint DF of true and modeled props
+theta.estim.long$type<- "Model"
+theta.estim.long2<- theta.estim.long %>% dplyr::select(names(true.behavior.long))
+theta.estim.long2$time1<- rep(1:5000, 3)
+theta.estim.long2<- theta.estim.long2[c(5001:10000,1:5000,10001:15000),]
+true.behavior.long$type<- "True"
+
+sq.err<- (theta.estim.long2$prop - true.behavior.long$prop)^2
+sq.err<- data.frame(sq.err = sq.err, behavior = true.behavior.long$behavior)
+
+#Mean Square Error for entire model and by behavior
+mean(sq.err$sq.err)  #0.0197
+
+sq.err %>% group_by(behavior) %>% summarise(mse = mean(sq.err))
+#Resting: 0.0205
+#Exploratory: 0.0324
+#Transit: 0.0061
+
+
+
 #export results
 # write.csv(dat2, "Modeled HC Sim Tracks w Behav.csv", row.names = F)  #for hard-clustering sim
 # write.csv(dat2, "Modeled MM Sim Tracks w Behav.csv", row.names = F)  #for mixed-membership sim

@@ -6,8 +6,7 @@
 
 ### Data Prep for Segmentation Model ###
 
-library(dplyr)
-library(ggplot2)
+library(tidyverse)
 library(lubridate)
 library(sp)
 library(raster)
@@ -92,7 +91,6 @@ ggplot(obs.long, aes(x=time, y=key, fill=value)) +
 setwd("~/Documents/Snail Kite Project/Data/R Scripts/ValleLabUF/git_segmentation_model")
 
 
-library(tidyverse)
 library(progress)
 library(furrr)
 library(tictoc)
@@ -223,7 +221,27 @@ accuracy[ind.acc]<- "Accurate Duplicate"
 accuracy[ind.inacc]<- "Inaccurate Duplicate"
 accuracy<- c(rep("True",length(true.brkpts)), accuracy)
 
+
+#identify missing breakpoints from model
+status<- matrix(NA,length(true.brkpts),1)
+for (i in 1:length(true.brkpts)) {
+  
+  tmp<- c(true.brkpts[i] - (50:0), true.brkpts[i] + (1:50)) %in% model.brkpts %>% sum()
+  
+  if (tmp == 0) {
+    status[i]<- "Missing"
+  } else {
+    status[i]<- "Present"
+  }
+}
+
+miss.ind<- which(status =="Missing")
+status.miss<- data.frame(brks = true.brkpts[miss.ind], type = rep("Model", length(miss.ind)),
+                         acc = rep("Missing", length(miss.ind)))
+
+
 all.brkpts$acc<- accuracy
+all.brkpts<- rbind(all.brkpts, status.miss)
 
 ggplot(all.brkpts, aes(x=brks, y=type, color = acc)) +
   geom_point(size=3) +
@@ -231,6 +249,13 @@ ggplot(all.brkpts, aes(x=brks, y=type, color = acc)) +
   labs(x="Time", y="Type") +
   theme(axis.title = element_text(size = 16), axis.text = element_text(size = 10), legend.position = "top") +
   scale_color_manual("Accuracy", values = c("forestgreen","lightgreen","firebrick","salmon","black"))
+
+
+
+## Calculate percentage of each measure of breakpoint accuracy for summary
+
+all.brkpts %>% filter(type == "Model") %>% group_by(acc) %>% summarise(n=n()) %>%
+  mutate(freq = n/sum(n))
 
 
 

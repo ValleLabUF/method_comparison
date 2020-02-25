@@ -114,7 +114,7 @@ accuracy<- c(rep("True",length(true.brkpts)), accuracy)
 status<- matrix(NA,length(true.brkpts),1)
 for (i in 1:length(true.brkpts)) {
   
-  tmp<- c(true.brkpts[i] - (20:0), true.brkpts[i] + (1:20)) %in% model.brkpts %>% sum()
+  tmp<- c(true.brkpts[i] - (50:0), true.brkpts[i] + (1:50)) %in% model.brkpts %>% sum()
   
   if (tmp == 0) {
     status[i]<- "Missing"

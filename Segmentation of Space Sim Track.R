@@ -53,6 +53,7 @@ ggplot() +
   scale_fill_viridis_c("# of Observations", alpha = 0.6) +
   labs(x = "X", y = "Y") +
   theme_bw() +
+  theme(panel.grid = element_blank()) +
   coord_equal()
 
 

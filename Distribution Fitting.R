@@ -53,11 +53,11 @@ sourceCpp('aux1.cpp')
 ############################
 
 #get data
-dat<- read.csv('Snail Kite Gridded Data_TOHO_behav.csv', header = T, sep = ',')
+dat<- read.csv('Snail Kite Gridded Data_TOHO_behav2.csv', header = T, sep = ',')
 dat$date<- dat$date %>% as_datetime()
 dat.list<- df.to.list(dat)  #for later behavioral assignment
 
-nbins<- c(6,8)  #number of bins per param (in order)
+nbins<- c(5,8)  #number of bins per param (in order)
 dat_red<- dat %>% dplyr::select(c(id, tseg, SL, TA))  #only keep necessary cols
 obs<- get.summary.stats_behav(dat = dat_red, nbins = nbins)  #to run Gibbs sampler on
 
@@ -87,7 +87,7 @@ res=LDA_behavior_gibbs(dat=obs, gamma1=gamma1, alpha=alpha,
 
 behav.res<- get_behav_hist(res = res, dat_red = dat_red)
 behav.res<- behav.res[behav.res$behav <=3,]  #only select the top 3 behaviors
-behav.res$behav<- factor(behav.res$behav, levels = c(3,1,2)) #reorder from slow to fast
+# behav.res$behav<- factor(behav.res$behav, levels = c(3,1,2)) #reorder from slow to fast
 
 #Plot histograms of frequency data; order color scale from slow to fast
 ggplot(behav.res, aes(x = bin, y = prop, fill = as.factor(behav))) +
@@ -112,9 +112,8 @@ behav.res.SL<- behav.res %>% filter(param == "SL")  #select only SL hists
 
 #define bin number and limits for step lengths
 max.dist=max(dat[dat$dt == 3600,]$dist, na.rm = T)
-upper90.thresh=as.numeric(quantile(dat[dat$dt == 3600,]$dist, 0.90, na.rm=T)) 
-dist.bin.lims=seq(from=0, to=upper90.thresh, length.out = 6)
-dist.bin.lims=c(dist.bin.lims, max.dist)  #6 bins
+dist.bin.lims=quantile(dat[dat$dt == 3600,]$dist, c(0,0.25,0.50,0.75,0.90), na.rm=T)
+dist.bin.lims=c(dist.bin.lims, max.dist)  #5 bins
 
 
 #functions for determing probs and optimization
@@ -192,14 +191,14 @@ weibull.function.optim=function(param, probs){
 }
 
 
-store.SL.probs<- matrix(NA, 3*3*max(behav.res.SL$bin), 4)  #3 behaviors for 3 sources of 6 bins
+store.SL.probs<- matrix(NA, 3*3*max(behav.res.SL$bin), 4)  #3 behaviors for 3 sources of 5 bins
 colnames(store.SL.probs)<- c("prop", "bin", "source", "behav")
 store.SL.probs[,2]<- rep(1:max(behav.res.SL$bin), times=3*3)
 store.SL.probs[,3]<- rep(rep(c("Discretized","Gamma","Weibull"), each=max(behav.res.SL$bin)), 3)
 store.SL.probs[,4]<- rep(1:3, each=3*max(behav.res.SL$bin))
 for (i in 1:length(unique(behav.res$behav))) {
   behav.prop<- behav.res.SL %>% filter(behav == i) %>% dplyr::select(prop)
-  SL.gamma.fit<- optim(c(0.5,0.01), gamma.function.optim, probs = behav.prop$prop, method = "Nelder-Mead")  
+  SL.gamma.fit<- optim(c(5,0.01), gamma.function.optim, probs = behav.prop$prop, method = "Nelder-Mead")  
   SL.weibull.fit<- optim(c(1,300), weibull.function.optim, probs = behav.prop$prop, method = "Nelder-Mead")
   
   ind<- which(store.SL.probs[,4] == i)
@@ -210,7 +209,7 @@ for (i in 1:length(unique(behav.res$behav))) {
 
 store.SL.probs<- as.data.frame(store.SL.probs)
 store.SL.probs$prop<- as.numeric(as.character(store.SL.probs$prop))
-store.SL.probs$behav<- factor(store.SL.probs$behav, levels = c(3,1,2))
+store.SL.probs$behav<- factor(store.SL.probs$behav, levels = c(1:3))
 levels(store.SL.probs$behav)<- c("Encamped","Exploratory","Transit")
 
 
@@ -328,7 +327,7 @@ for (i in 1:length(unique(behav.res$behav))) {
 
 store.TA.probs<- as.data.frame(store.TA.probs)
 store.TA.probs$prop<- as.numeric(as.character(store.TA.probs$prop))
-store.TA.probs$behav<- factor(store.TA.probs$behav, levels = c(3,1,2))
+store.TA.probs$behav<- factor(store.TA.probs$behav, levels = c(1:3))
 levels(store.TA.probs$behav)<- c("Encamped","Exploratory","Transit")
 
 
@@ -368,7 +367,7 @@ for (i in 1:length(unique(behav.res$behav))) {
 
 store.TA.probs<- as.data.frame(store.TA.probs)
 store.TA.probs$prop<- as.numeric(as.character(store.TA.probs$prop))
-store.TA.probs$behav<- factor(store.TA.probs$behav, levels = c(3,1,2))
+store.TA.probs$behav<- factor(store.TA.probs$behav, levels = c(1:3))
 levels(store.TA.probs$behav)<- c("Encamped","Exploratory","Transit")
 
 #Turning Angle comparison

@@ -27,7 +27,7 @@ setwd("~/Documents/Snail Kite Project/Data/R Scripts/ValleLabUF/method_compariso
 dat<- read.csv("CRW_HC_tsegs.csv", as.is = T)  #hard clustering sim
 # dat<- read.csv("CRW_MM_tsegs.csv", as.is = T)  #mixed-membership sim
 dat.list<- df.to.list(dat)  #for later behavioral assignment
-nbins<- c(6,8)  #number of bins per param (in order)
+nbins<- c(5,8)  #number of bins per param (in order)
 dat_red<- dat %>% dplyr::select(c(id, tseg, SL, TA))  #only keep necessary cols
 obs<- get.summary.stats_behav(dat = dat_red, nbins = nbins)  #to run Gibbs sampler on
 
@@ -85,7 +85,7 @@ theta.estim<- data.frame(id = obs$id, tseg = obs$tseg, theta.estim)
 #DEFINE BEHAVIOR ORDER BASED ON HISTOGRAMS
 names(theta.estim)<- c("id", "tseg","Resting","Exploratory","Transit")  #for HC CRW
 # names(theta.estim)<- c("id", "tseg","Exploratory","Resting","Transit")  #for MM CRW
-nobs<- data.frame(id = obs$id, tseg = obs$tseg, n = apply(obs[,3:8], 1, sum)) #calc obs per tseg using SL bins (more reliable than TA)
+nobs<- data.frame(id = obs$id, tseg = obs$tseg, n = apply(obs[,3:7], 1, sum)) #calc obs per tseg using SL bins (more reliable than TA)
 
 #Create augmented matrix by replicating rows (tsegs) according to obs per tseg
 theta.estim2<- aug_behav_df(dat = dat[-1,] %>% mutate(date=1:nrow(dat[-1,])),
@@ -141,6 +141,7 @@ ggplot(theta.estim.long) +
   theme_bw() +
   theme(axis.title = element_text(size = 16), axis.text.y = element_text(size = 14),
         axis.text.x.bottom = element_text(size = 12)) +
+  scale_x_continuous(breaks = c(0, 2000, 4000)) +
   facet_wrap(~behavior)
 
 #Plot scatterplot and compare to 1:1 line

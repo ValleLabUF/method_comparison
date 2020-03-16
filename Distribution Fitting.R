@@ -191,20 +191,82 @@ weibull.function.optim=function(param, probs){
 }
 
 
+#Initialize optim functions using 100 different combinations of both params for gamma and weibull
+
 store.SL.probs<- matrix(NA, 3*3*max(behav.res.SL$bin), 4)  #3 behaviors for 3 sources of 5 bins
 colnames(store.SL.probs)<- c("prop", "bin", "source", "behav")
 store.SL.probs[,2]<- rep(1:max(behav.res.SL$bin), times=3*3)
 store.SL.probs[,3]<- rep(rep(c("Discretized","Gamma","Weibull"), each=max(behav.res.SL$bin)), 3)
 store.SL.probs[,4]<- rep(1:3, each=3*max(behav.res.SL$bin))
+
+#initial values for gamma distrib
+param1<- vector()
+param1[1]<- 0.0625
+for (i in 2:10) {
+  param1[i]<- 2*param1[i-1]
+}
+param1
+
+param2<- vector()
+param2[1]<- 0.0001
+for (i in 2:10) {
+  param2[i]<- 10*param2[i-1]
+}
+param2
+
+gamma.params<- expand.grid(param1, param2)
+
+
+#initial values for weibull distrib
+param1<- vector()
+param1[1]<- 0.0625
+for (i in 2:10) {
+  
+  param1[i]<- 2*param1[i-1]
+}
+param1
+
+
+param2<- vector()
+param2[1]<- 25
+for (i in 2:10) {
+  
+  param2[i]<- 2*param2[i-1]
+}
+param2
+
+weibull.params<- expand.grid(param1, param2)
+
+
 for (i in 1:length(unique(behav.res$behav))) {
   behav.prop<- behav.res.SL %>% filter(behav == i) %>% dplyr::select(prop)
-  SL.gamma.fit<- optim(c(5,0.01), gamma.function.optim, probs = behav.prop$prop, method = "Nelder-Mead")  
-  SL.weibull.fit<- optim(c(1,300), weibull.function.optim, probs = behav.prop$prop, method = "Nelder-Mead")
+  
+  
+  SL.gamma.res<- matrix(NA, nrow(gamma.params), 3)
+  colnames(SL.gamma.res)<- c("param1","param2","value")
+  for (j in 1:nrow(gamma.params)) {
+  SL.gamma.fit<- optim(c(gamma.params[j,1], gamma.params[j,2]), gamma.function.optim,
+                       probs = behav.prop$prop, method = "Nelder-Mead")
+  SL.gamma.res[j,1:2]<- SL.gamma.fit$par
+  SL.gamma.res[j,3]<- SL.gamma.fit$value
+  }
+  
+  
+  SL.weibull.res<- matrix(NA, nrow(weibull.params), 3)
+  colnames(SL.weibull.res)<- c("param1","param2","value")
+  for (k in 1:nrow(weibull.params)) {
+  SL.weibull.fit<- optim(c(weibull.params[k,1], weibull.params[k,2]), weibull.function.optim,
+                         probs = behav.prop$prop, method = "Nelder-Mead")
+  SL.weibull.res[k,1:2]<- SL.weibull.fit$par
+  SL.weibull.res[k,3]<- SL.weibull.fit$value
+  }
   
   ind<- which(store.SL.probs[,4] == i)
   store.SL.probs[ind,1]<- c(behav.prop$prop,
-                            gamma.function(SL.gamma.fit$par),
-                            weibull.function(SL.weibull.fit$par))
+                            gamma.function(SL.gamma.res[which.min(SL.gamma.res[,"value"]),
+                                                        c("param1","param2")]),
+                            weibull.function(SL.weibull.res[which.min(SL.weibull.res[,"value"]),
+                                                            c("param1","param2")]))
 }
 
 store.SL.probs<- as.data.frame(store.SL.probs)
@@ -308,21 +370,50 @@ wc.function.optim=function(param, probs){
 }
 
 
+#Initialize optim functions using 100 different combinations of both params for von mises and wrapped cauchy
+
 store.TA.probs<- matrix(NA, 3*3*max(behav.res.TA$bin), 4)  #3 behaviors for 3 sources of 8 bins
 colnames(store.TA.probs)<- c("prop", "bin", "source", "behav")
 store.TA.probs[,2]<- rep(1:max(behav.res.TA$bin), times=3*3)
 store.TA.probs[,3]<- rep(rep(c("Discretized","von Mises","wrapped Cauchy"),
                              each=max(behav.res.TA$bin)), 3)
 store.TA.probs[,4]<- rep(1:3, each=3*max(behav.res.TA$bin))
+
+
+#initial values for von mises and wrapped cauchy distribs
+param1<- seq(-pi, pi, length.out = 10)
+param2<- seq(0.1, 1, length.out = 10)
+
+TA.init.params<- expand.grid(param1, param2)
+
+
 for (i in 1:length(unique(behav.res$behav))) {
   behav.prop<- behav.res.TA %>% filter(behav == i) %>% dplyr::select(prop)
-  TA.vm.fit<- optim(c(-pi,0.7), vm.function.optim, probs = behav.prop$prop, method = "Nelder-Mead")
-  TA.wc.fit<- optim(c(-pi,0.7), wc.function.optim, probs = behav.prop$prop, method = "Nelder-Mead")
+  
+  TA.vm.res<- matrix(NA, nrow(TA.init.params), 3)
+  colnames(TA.vm.res)<- c("param1","param2","value")
+  for (j in 1:nrow(TA.init.params)) {
+  TA.vm.fit<- optim(c(TA.init.params[j,1], TA.init.params[j,2]), vm.function.optim,
+                    probs = behav.prop$prop, method = "Nelder-Mead")
+  TA.vm.res[j,1:2]<- TA.vm.fit$par
+  TA.vm.res[j,3]<- TA.vm.fit$value
+  }
+  
+  TA.wc.res<- matrix(NA, nrow(TA.init.params), 3)
+  colnames(TA.wc.res)<- c("param1","param2","value")
+  for (k in 1:nrow(TA.init.params)) {
+  TA.wc.fit<- optim(c(TA.init.params[k,1], TA.init.params[k,2]), wc.function.optim,
+                    probs = behav.prop$prop, method = "Nelder-Mead")
+  TA.wc.res[k,1:2]<- TA.wc.fit$par
+  TA.wc.res[k,3]<- TA.wc.fit$value
+  }
   
   ind<- which(store.TA.probs[,4] == i)
   store.TA.probs[ind,1]<- c(behav.prop$prop,
-                            vm.function(TA.vm.fit$par),
-                            wc.function(TA.wc.fit$par))
+                            vm.function(TA.vm.res[which.min(TA.vm.res[,"value"]),
+                                                     c("param1","param2")]),
+                            wc.function(TA.wc.res[which.min(TA.wc.res[,"value"]),
+                                                     c("param1","param2")]))
 }
 
 store.TA.probs<- as.data.frame(store.TA.probs)

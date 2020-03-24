@@ -22,7 +22,7 @@ setwd("~/Documents/Snail Kite Project/Data/R Scripts/ValleLabUF/method_compariso
 
 #load and manipulate data
 dat<- read.csv("CRW_HC_sim.csv", as.is = T)  #for hard-clustering sim
-# dat<- read.csv("CRW_MM_sim.csv", as.is = T)  #for mixed-membership sim
+# dat<- read.csv("CRW_MM_sim_2behav.csv", as.is = T)  #for mixed-membership sim
 dat$dt<- 3600
 dat$id<- 1
 dat.list<- df.to.list(dat=dat)
@@ -89,7 +89,7 @@ param.prop[6:13, "value"]<- (diff(angle.bin.lims)/2) + angle.bin.lims[1:8]
 ggplot(data = param.prop %>% filter(key == "SL"), aes(value, prop)) +
   geom_bar(stat = "identity", width = (diff(dist.bin.lims)-0.025),
            fill = "lightblue", color = "black") +
-  facet_zoom(xlim = c(0,5)) +
+  # facet_zoom(xlim = c(0,5)) +
   labs(x = "Step Length", y = "Proportion") +
   theme_bw() +
   theme(panel.grid = element_blank(), axis.title = element_text(size = 16),
@@ -116,7 +116,7 @@ ngibbs = 40000
 
 plan(multisession)
 dat.res<- behavior_segment(data = behav.list2, ngibbs = ngibbs, nbins = c(5,8), alpha = alpha)
-#takes 13.5 min for 40000 iterations
+#takes 9 min for 40000 iterations
 
 
 ## Traceplots
@@ -220,4 +220,4 @@ dat_out<- map(behav.list, assign.time.seg, brkpts = brkpts) %>% map_dfr(`[`)  #a
 
 #export results for hard-clustering and mixed-membership simulations
 # write.csv(dat_out, "CRW_HC_tsegs.csv", row.names = F)
-# write.csv(dat_out, "CRW_MM_tsegs.csv", row.names = F)
+# write.csv(dat_out, "CRW_MM_tsegs_2behav.csv", row.names = F)

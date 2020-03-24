@@ -75,3 +75,40 @@ model.b_transit<- which(model.b == 3)
 (which(true.b.coarse_transit %in% model.b_transit) %>% length()) / length(true.b.coarse_transit)
 # 99.6% accuracy for 'Transit' at coarse scale
 
+
+
+
+
+
+
+####################################
+### Mixed-Membership Sim 2 Behav ###
+####################################
+
+### Assess model accuracy
+
+dat<- read.csv("Modeled MM Sim Tracks w 2 Behav.csv", as.is = T)
+
+## Overall
+true.b.coarse<- dat$behav_coarse[-1] %>% factor(levels = c("Encamped","Transit")) %>%
+  as.numeric()
+model.b<- dat$behav[-1] %>% factor(levels = c("Encamped","Transit")) %>%
+  as.numeric()
+
+(which(true.b.coarse == model.b) %>% length()) / length(true.b.coarse)
+# 99.0% accuracy when including all different behaviors together at coarse scale
+
+
+
+## For 'Encamped' behavior
+true.b.coarse_enc<- which(true.b.coarse == 1)
+model.b_enc<- which(model.b == 1)
+(which(true.b.coarse_enc %in% model.b_enc) %>% length()) / length(true.b.coarse_enc)
+# 99.3% accuracy for 'Encamped' at coarse scale
+
+## For 'Transit' behavior
+true.b.coarse_transit<- which(true.b.coarse == 2)
+model.b_transit<- which(model.b == 2)
+(which(true.b.coarse_transit %in% model.b_transit) %>% length()) / length(true.b.coarse_transit)
+# 98.0% accuracy for 'Transit' at coarse scale
+

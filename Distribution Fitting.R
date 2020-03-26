@@ -87,7 +87,6 @@ res=LDA_behavior_gibbs(dat=obs, gamma1=gamma1, alpha=alpha,
 
 behav.res<- get_behav_hist(res = res, dat_red = dat_red)
 behav.res<- behav.res[behav.res$behav <=3,]  #only select the top 3 behaviors
-# behav.res$behav<- factor(behav.res$behav, levels = c(3,1,2)) #reorder from slow to fast
 
 #Plot histograms of frequency data; order color scale from slow to fast
 ggplot(behav.res, aes(x = bin, y = prop, fill = as.factor(behav))) +
@@ -277,12 +276,14 @@ levels(store.SL.probs$behav)<- c("Encamped","Exploratory","Transit")
 
 #Step Length comparison
 ggplot(store.SL.probs, aes(x=bin, y=prop)) +
-  geom_bar(aes(fill=source), position = "dodge", stat="identity", color = "black") +
+  geom_area(aes(fill=source, color = source, group = source),
+            position = position_dodge(width = 0), stat="identity", alpha = 0.35) +
   labs(x="Bins", y="Proportion") +
-  scale_fill_manual(values = wes_palette(3, name = "Zissou1", type = "continuous")) +
+  scale_fill_viridis_d() +
+  scale_color_viridis_d(guide = F) +
   theme_bw() +
   facet_wrap(~behav) +
-  guides(fill = guide_legend(title = "Distribution")) +
+  guides(fill = guide_legend(title = "Distribution", override.aes = list(alpha = 1))) +
   theme(axis.title = element_text(size = 16), axis.text = element_text(size = 12),
         strip.text = element_text(size = 12, face = "bold"))
 
@@ -424,12 +425,14 @@ levels(store.TA.probs$behav)<- c("Encamped","Exploratory","Transit")
 
 #Turning Angle comparison
 ggplot(store.TA.probs, aes(x=bin, y=prop)) +
-  geom_bar(aes(fill=source), position = "dodge", stat="identity", color = "black") +
+  geom_area(aes(fill=source, color = source, group = source),
+            position = position_dodge(width = 0), stat="identity", alpha = 0.35) +
   labs(x="Bins", y="Proportion") +
-  scale_fill_manual(values = wes_palette(3, name = "Zissou1", type = "continuous")) +
+  scale_fill_viridis_d() +
+  scale_color_viridis_d(guide = F) +
   theme_bw() +
   facet_wrap(~behav) +
-  guides(fill = guide_legend(title = "Distribution")) +
+  guides(fill = guide_legend(title = "Distribution", override.aes = list(alpha = 1))) +
   theme(axis.title = element_text(size = 16), axis.text = element_text(size = 12),
         strip.text = element_text(size = 12, face = "bold"))
 
@@ -463,11 +466,274 @@ levels(store.TA.probs$behav)<- c("Encamped","Exploratory","Transit")
 
 #Turning Angle comparison
 ggplot(store.TA.probs, aes(x=bin, y=prop)) +
-  geom_bar(aes(fill=source), position = "dodge", stat="identity", color = "black") +
+  geom_area(aes(fill=source, color = source, group = source),
+            position = position_dodge(width = 0), stat="identity", alpha = 0.35) +
   labs(x="Bins", y="Proportion") +
-  scale_fill_manual(values = wes_palette(3, name = "Zissou1", type = "continuous")) +
+  scale_fill_viridis_d() +
+  scale_color_viridis_d(guide = F) +
   theme_bw() +
   facet_wrap(~behav) +
-  guides(fill = guide_legend(title = "Distribution")) +
+  guides(fill = guide_legend(title = "Distribution", override.aes = list(alpha = 1))) +
+  theme(axis.title = element_text(size = 16), axis.text = element_text(size = 12),
+        strip.text = element_text(size = 12, face = "bold"))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### Snow leopard example
+
+############################
+#### Load and Prep Data ####
+############################
+
+set.seed(1)
+
+#get data
+dat<- read.csv('Snow Leopard Data_behav.csv', header = T, sep = ',')
+dat$date<- dat$date %>% as_datetime()
+dat.list<- df.to.list(dat)  #for later behavioral assignment
+
+nbins<- c(5,8)  #number of bins per param (in order)
+dat_red<- dat %>% dplyr::select(c(id, tseg, SL, TA))  #only keep necessary cols
+obs<- get.summary.stats_behav(dat = dat_red, nbins = nbins)  #to run Gibbs sampler on
+
+
+#prepare for Gibbs sampler
+ngibbs=1000
+nburn=ngibbs/2
+nmaxclust=max(nbins) - 1  #one fewer than max number of bins used for params
+ndata.types=length(nbins)
+
+#prior
+gamma1=0.1
+alpha=0.1 
+
+#####################################################
+#### Run Gibbs Sampler on All IDs Simultaneously ####
+#####################################################
+
+res=LDA_behavior_gibbs(dat=obs, gamma1=gamma1, alpha=alpha,
+                       ngibbs=ngibbs, nmaxclust=nmaxclust,
+                       nburn=nburn, ndata.types=ndata.types)
+
+
+#################################################################
+#### Visualize Histograms of Movement Parameters by Behavior ####
+#################################################################
+
+behav.res<- get_behav_hist(res = res, dat_red = dat_red)
+behav.res<- behav.res[behav.res$behav <=3,]  #only select the top 3 behaviors
+
+#Plot histograms of frequency data; order color scale from slow to fast
+ggplot(behav.res, aes(x = bin, y = prop, fill = as.factor(behav))) +
+  geom_bar(stat = 'identity') +
+  labs(x = "\nBin", y = "Proportion\n") +
+  theme_bw() +
+  theme(axis.title = element_text(size = 16), axis.text.y = element_text(size = 14),
+        axis.text.x.bottom = element_text(size = 12),
+        strip.text = element_text(size = 14), strip.text.x = element_text(face = "bold")) +
+  scale_fill_manual(values = viridis(n=3), guide = F) +
+  facet_grid(param ~ behav, scales = "free_y")
+
+
+
+### SL
+
+#Specify the mass distributions per behavior for SL
+behav.res.SL<- behav.res %>% filter(param == "SL")  #select only SL hists
+
+#define bin number and limits for step lengths
+max.dist=max(dat[dat$dt == 10800,]$dist, na.rm = T)
+dist.bin.lims=quantile(dat[dat$dt == 10800,]$dist, c(0,0.25,0.50,0.75,0.90), na.rm=T)
+dist.bin.lims=c(dist.bin.lims, max.dist)  #5 bins
+
+
+
+#Initialize optim functions using 100 different combinations of both params for gamma and weibull
+
+store.SL.probs<- matrix(NA, 3*3*max(behav.res.SL$bin), 4)  #3 behaviors for 3 sources of 5 bins
+colnames(store.SL.probs)<- c("prop", "bin", "source", "behav")
+store.SL.probs[,2]<- rep(1:max(behav.res.SL$bin), times=3*3)
+store.SL.probs[,3]<- rep(rep(c("Discretized","Gamma","Weibull"), each=max(behav.res.SL$bin)), 3)
+store.SL.probs[,4]<- rep(1:3, each=3*max(behav.res.SL$bin))
+
+#initial values for gamma distrib
+param1<- vector()
+param1[1]<- 0.0625
+for (i in 2:10) {
+  param1[i]<- 2*param1[i-1]
+}
+param1
+
+param2<- vector()
+param2[1]<- 0.0001
+for (i in 2:10) {
+  param2[i]<- 10*param2[i-1]
+}
+param2
+
+gamma.params<- expand.grid(param1, param2)
+
+
+#initial values for weibull distrib
+param1<- vector()
+param1[1]<- 0.25
+for (i in 2:10) {
+  
+  param1[i]<- 2*param1[i-1]
+}
+param1
+
+
+param2<- vector()
+param2[1]<- 0.0625
+for (i in 2:10) {
+  
+  param2[i]<- 2*param2[i-1]
+}
+param2
+
+weibull.params<- expand.grid(param1, param2)
+
+
+for (i in 1:length(unique(behav.res$behav))) {
+  behav.prop<- behav.res.SL %>% filter(behav == i) %>% dplyr::select(prop)
+  
+  
+  SL.gamma.res<- matrix(NA, nrow(gamma.params), 3)
+  colnames(SL.gamma.res)<- c("param1","param2","value")
+  for (j in 1:nrow(gamma.params)) {
+    SL.gamma.fit<- optim(c(gamma.params[j,1], gamma.params[j,2]), gamma.function.optim,
+                         probs = behav.prop$prop, method = "Nelder-Mead")
+    SL.gamma.res[j,1:2]<- SL.gamma.fit$par
+    SL.gamma.res[j,3]<- SL.gamma.fit$value
+  }
+  
+  
+  SL.weibull.res<- matrix(NA, nrow(weibull.params), 3)
+  colnames(SL.weibull.res)<- c("param1","param2","value")
+  for (k in 1:nrow(weibull.params)) {
+    SL.weibull.fit<- optim(c(weibull.params[k,1], weibull.params[k,2]), weibull.function.optim,
+                           probs = behav.prop$prop, method = "Nelder-Mead")
+    SL.weibull.res[k,1:2]<- SL.weibull.fit$par
+    SL.weibull.res[k,3]<- SL.weibull.fit$value
+  }
+  
+  ind<- which(store.SL.probs[,4] == i)
+  store.SL.probs[ind,1]<- c(behav.prop$prop,
+                            gamma.function(SL.gamma.res[which.min(SL.gamma.res[,"value"]),
+                                                        c("param1","param2")]),
+                            weibull.function(SL.weibull.res[which.min(SL.weibull.res[,"value"]),
+                                                            c("param1","param2")]))
+}
+
+store.SL.probs<- as.data.frame(store.SL.probs)
+store.SL.probs$prop<- as.numeric(as.character(store.SL.probs$prop))
+store.SL.probs$behav<- factor(store.SL.probs$behav, levels = c(2,3,1))
+levels(store.SL.probs$behav)<- c("Resting","Encamped","Exploratory")
+
+
+#Step Length comparison
+ggplot(store.SL.probs, aes(x=bin, y=prop)) +
+  geom_area(aes(fill=source, color = source, group = source),
+            position = position_dodge(width = 0), stat="identity", alpha = 0.35) +
+  labs(x="Bins", y="Proportion") +
+  scale_fill_viridis_d() +
+  scale_color_viridis_d(guide = F) +
+  theme_bw() +
+  facet_wrap(~behav) +
+  guides(fill = guide_legend(title = "Distribution", override.aes = list(alpha = 1))) +
+  theme(axis.title = element_text(size = 16), axis.text = element_text(size = 12),
+        strip.text = element_text(size = 12, face = "bold"))
+
+
+
+
+
+
+
+
+### TA
+
+#Specify the mass distributions per behavior for TA
+behav.res.TA<- behav.res %>% filter(param == "TA")  #select only TA hists
+
+
+#Initialize optim functions using 100 different combinations of both params for von mises and wrapped cauchy
+
+store.TA.probs<- matrix(NA, 3*3*max(behav.res.TA$bin), 4)  #3 behaviors for 3 sources of 8 bins
+colnames(store.TA.probs)<- c("prop", "bin", "source", "behav")
+store.TA.probs[,2]<- rep(1:max(behav.res.TA$bin), times=3*3)
+store.TA.probs[,3]<- rep(rep(c("Discretized","von Mises","wrapped Cauchy"),
+                             each=max(behav.res.TA$bin)), 3)
+store.TA.probs[,4]<- rep(1:3, each=3*max(behav.res.TA$bin))
+
+
+#initial values for von mises and wrapped cauchy distribs
+param1<- seq(-pi, pi, length.out = 10)
+param2<- seq(-0.5, 0.5, length.out = 10)
+
+TA.init.params<- expand.grid(param1, param2)
+
+
+for (i in 1:length(unique(behav.res$behav))) {
+  behav.prop<- behav.res.TA %>% filter(behav == i) %>% dplyr::select(prop)
+  
+  TA.vm.res<- matrix(NA, nrow(TA.init.params), 3)
+  colnames(TA.vm.res)<- c("param1","param2","value")
+  for (j in 1:nrow(TA.init.params)) {
+    TA.vm.fit<- optim(c(TA.init.params[j,1], TA.init.params[j,2]), vm.function.optim,
+                      probs = behav.prop$prop, method = "Nelder-Mead")
+    TA.vm.res[j,1:2]<- TA.vm.fit$par
+    TA.vm.res[j,3]<- TA.vm.fit$value
+  }
+  
+  TA.wc.res<- matrix(NA, nrow(TA.init.params), 3)
+  colnames(TA.wc.res)<- c("param1","param2","value")
+  for (k in 1:nrow(TA.init.params)) {
+    TA.wc.fit<- optim(c(TA.init.params[k,1], TA.init.params[k,2]), wc.function.optim,
+                      probs = behav.prop$prop, method = "Nelder-Mead")
+    TA.wc.res[k,1:2]<- TA.wc.fit$par
+    TA.wc.res[k,3]<- TA.wc.fit$value
+  }
+  
+  ind<- which(store.TA.probs[,4] == i)
+  store.TA.probs[ind,1]<- c(behav.prop$prop,
+                            vm.function(TA.vm.res[which.min(TA.vm.res[,"value"]),
+                                                  c("param1","param2")]),
+                            wc.function(TA.wc.res[which.min(TA.wc.res[,"value"]),
+                                                  c("param1","param2")]))
+}
+
+store.TA.probs<- as.data.frame(store.TA.probs)
+store.TA.probs$prop<- as.numeric(as.character(store.TA.probs$prop))
+store.TA.probs$behav<- factor(store.TA.probs$behav, levels = c(2,3,1))
+levels(store.TA.probs$behav)<- c("Resting","Encamped","Exploratory")
+
+
+#Turning Angle comparison
+ggplot(store.TA.probs, aes(x=bin, y=prop)) +
+  geom_area(aes(fill=source, color = source, group = source),
+            position = position_dodge(width = 0), stat="identity", alpha = 0.35) +
+  labs(x="Bins", y="Proportion") +
+  scale_fill_viridis_d() +
+  scale_color_viridis_d(guide = F) +
+  theme_bw() +
+  facet_wrap(~behav) +
+  guides(fill = guide_legend(title = "Distribution", override.aes = list(alpha = 1))) +
   theme(axis.title = element_text(size = 16), axis.text = element_text(size = 12),
         strip.text = element_text(size = 12, face = "bold"))

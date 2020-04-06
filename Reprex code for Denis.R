@@ -1,3 +1,4 @@
+rm(list=ls(all=TRUE))
 set.seed(1)
 
 library(tidyverse)
@@ -8,9 +9,8 @@ library(circular)
 #######################
 ## Load and viz data ##
 #######################
-
+source('aux functions VM.R')
 behav.res<- read.csv('Denis snow leopard reprex data.csv', header = T, sep = ',')
-
 
 #Plot histograms of frequency data
 ggplot(behav.res, aes(x = bin, y = prop, fill = as.factor(behav))) +
@@ -23,53 +23,6 @@ ggplot(behav.res, aes(x = bin, y = prop, fill = as.factor(behav))) +
   scale_fill_manual(values = viridis(n=3), guide = F) +
   facet_grid(param ~ behav, scales = "free_y")
 
-
-
-
-
-###############
-## Functions ##
-###############
-
-vm.function=function(param){  #for calculating probability masses
-  mu1=param[1]
-  kappa1=exp(param[2])
-  
-  bins.estim=rep(NA,(length(angle.bin.lims) - 1))
-  
-  for (i in 2:length(angle.bin.lims)) {
-    if (i-1 == 1) {
-      bins.estim[i-1]=pvonmises(angle.bin.lims[i],mu=mu1,kappa=kappa1)
-    } else {
-      bins.estim[i-1]=pvonmises(angle.bin.lims[i],mu=mu1,kappa=kappa1)-
-        pvonmises(angle.bin.lims[i-1],mu=mu1,kappa=kappa1)
-    }
-  }
-  
-  bins.estim
-}
-
-#----------------------------------
-vm.function.optim=function(param, probs){  #for optimization
-  mu1=param[1]
-  kappa1=exp(param[2])
-  
-  bins.estim=rep(NA,(length(angle.bin.lims) - 1))
-  
-  for (i in 2:length(angle.bin.lims)) {
-    if (i-1 == 1) {
-      bins.estim[i-1]=pvonmises(angle.bin.lims[i],mu=mu1,kappa=kappa1)
-    } else {
-      bins.estim[i-1]=pvonmises(angle.bin.lims[i],mu=mu1,kappa=kappa1)-
-        pvonmises(angle.bin.lims[i-1],mu=mu1,kappa=kappa1)
-    }
-  }
-  
-  mean(abs(probs-bins.estim))  #Mean Absolute Error
-}
-
-
-
 ###################################################
 ## Optimize functions based on von Mises distrib ##
 ###################################################
@@ -80,13 +33,12 @@ behav.res.TA<- behav.res %>% filter(param == "TA")  #select only TA hists
 #define bin number and limits for turning angles
 angle.bin.lims=seq(from=-pi, to=pi, by=pi/4)  #8 bins
 
-
 #Initialize optim functions using 100 different combinations of both params for von mises and wrapped cauchy
 param1<- seq(-pi, pi, length.out = 10)
-param2<- seq(-3, 3, length.out = 10)
+param2<- c(seq(0.1, 0.9, length.out = 5),
+           seq(1, 100, length.out = 5))
 
 TA.init.params<- expand.grid(param1, param2)
-
 
 #Only fit for behavior 3
 behav.prop<- behav.res.TA %>% filter(behav == 3) %>% dplyr::select(prop)
@@ -95,12 +47,14 @@ behav.prop<- behav.res.TA %>% filter(behav == 3) %>% dplyr::select(prop)
 TA.vm.res<- matrix(NA, nrow(TA.init.params), 3)
 colnames(TA.vm.res)<- c("param1","param2","MAE")
 for (j in 1:nrow(TA.init.params)) {
-  TA.vm.fit<- optim(c(TA.init.params[j,1], TA.init.params[j,2]), vm.function.optim,
-                    probs = behav.prop$prop, method = "Nelder-Mead")
+  print(j)
+  param=c(TA.init.params[j,1], TA.init.params[j,2])
+  TA.vm.fit<- optim(par=param, vm.function.optim,
+                    probs = behav.prop$prop, method = "L-BFGS-B",
+                    lower=c(-pi,0.001),upper=c(pi,10000)) #box-constrained optimization
   TA.vm.res[j,1:2]<- TA.vm.fit$par
   TA.vm.res[j,3]<- TA.vm.fit$value
 }
-
 
 store.TA.probs<- matrix(NA, 1*2*max(behav.res.TA$bin), 4)  #1 behavior for 2 sources of 8 bins
 colnames(store.TA.probs)<- c("prop", "bin", "source", "behav")

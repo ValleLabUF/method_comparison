@@ -24,6 +24,7 @@ optim(c(1,.001),obj.function)
 
 
 ### Snail kite example
+source('aux functions VM.R')  #source Denis' code that fixes pvonmises() and uses box-constrained                               #optimization
 
 setwd("~/Documents/Snail Kite Project/Data/R Scripts/ValleLabUF/git_LDA_behavior")
 
@@ -44,6 +45,7 @@ source('LDA_behavior_function.R')
 source('gibbs sampler.R')
 source('helper functions.R')
 sourceCpp('aux1.cpp')
+
 
 
 
@@ -301,72 +303,63 @@ behav.res.TA<- behav.res %>% filter(param == "TA")  #select only TA hists
 angle.bin.lims=seq(from=-pi, to=pi, by=pi/4)  #8 bins
 
 
-vm.function=function(param){
-  mu1=param[1]
-  kappa1=exp(param[2])
-  
-  bins.estim=rep(NA,(length(angle.bin.lims) - 1))
-  
-  for (i in 2:length(angle.bin.lims)) {
-    if (i-1 == 1) {
-      bins.estim[i-1]=pvonmises(angle.bin.lims[i],mu=mu1,kappa=kappa1)
-    } else {
-      bins.estim[i-1]=pvonmises(angle.bin.lims[i],mu=mu1,kappa=kappa1)-
-        pvonmises(angle.bin.lims[i-1],mu=mu1,kappa=kappa1)
-    }
-  }
-  
-  bins.estim
-}
-
-vm.function.optim=function(param, probs){
-  mu1=param[1]
-  kappa1=exp(param[2])
-  
-  bins.estim=rep(NA,(length(angle.bin.lims) - 1))
-  
-  for (i in 2:length(angle.bin.lims)) {
-    if (i-1 == 1) {
-      bins.estim[i-1]=pvonmises(angle.bin.lims[i],mu=mu1,kappa=kappa1)
-    } else {
-      bins.estim[i-1]=pvonmises(angle.bin.lims[i],mu=mu1,kappa=kappa1)-
-        pvonmises(angle.bin.lims[i-1],mu=mu1,kappa=kappa1)
-    }
-  }
-  
-  mean(abs(probs-bins.estim))  #Mean Absolute Error
-}
+# vm.function=function(param){
+#   mu1=param[1]
+#   kappa1=exp(param[2])
+#   
+#   bins.estim=rep(NA,(length(angle.bin.lims) - 1))
+#   
+#   for (i in 2:length(angle.bin.lims)) {
+#     if (i-1 == 1) {
+#       bins.estim[i-1]=pvonmises(angle.bin.lims[i],mu=mu1,kappa=kappa1)
+#     } else {
+#       bins.estim[i-1]=pvonmises(angle.bin.lims[i],mu=mu1,kappa=kappa1)-
+#         pvonmises(angle.bin.lims[i-1],mu=mu1,kappa=kappa1)
+#     }
+#   }
+#   
+#   bins.estim
+# }
+# 
+# vm.function.optim=function(param, probs){
+#   mu1=param[1]
+#   kappa1=exp(param[2])
+#   
+#   bins.estim=rep(NA,(length(angle.bin.lims) - 1))
+#   
+#   for (i in 2:length(angle.bin.lims)) {
+#     if (i-1 == 1) {
+#       bins.estim[i-1]=pvonmises(angle.bin.lims[i],mu=mu1,kappa=kappa1)
+#     } else {
+#       bins.estim[i-1]=pvonmises(angle.bin.lims[i],mu=mu1,kappa=kappa1)-
+#         pvonmises(angle.bin.lims[i-1],mu=mu1,kappa=kappa1)
+#     }
+#   }
+#   
+#   mean(abs(probs-bins.estim))  #Mean Absolute Error
+# }
 
 
 wc.function=function(param){
-  mu1=param[1]
-  rho1=exp(param[2]) / (1+exp(param[2]))
+  mu1=circular(param[1],type='angles',units='radians')
+  rho1=exp(param[2])/(1+exp(param[2]))
   
   bins.estim=rep(NA,(length(angle.bin.lims) - 1))
   
   for (i in 2:length(angle.bin.lims)) {
-    
-    pwrappedcauchy=integrate(dwrappedcauchy, angle.bin.lims[i-1], angle.bin.lims[i],
-                             mu=circular(mu1), rho=rho1)
+    pwrappedcauchy=integrate(dwrappedcauchy,
+                             angle.bin.lims[i-1],
+                             angle.bin.lims[i],
+                             mu=mu1,
+                             rho=rho1)
     bins.estim[i-1]=pwrappedcauchy$value
   }
   
   bins.estim
 }
 
-wc.function.optim=function(param, probs){
-  mu1=param[1]
-  rho1=exp(param[2]) / (1+exp(param[2]))
-  
-  bins.estim=rep(NA,(length(angle.bin.lims) - 1))
-  
-  for (i in 2:length(angle.bin.lims)) {
-    
-    pwrappedcauchy=integrate(dwrappedcauchy, angle.bin.lims[i-1], angle.bin.lims[i],
-                             mu=circular(mu1), rho=rho1)
-    bins.estim[i-1]=pwrappedcauchy$value
-  }
-  
+wc.function.optim=function(param, probs){  #for optimization
+  bins.estim=wc.function(param)
   mean(abs(probs-bins.estim))  #Mean Absolute Error
 }
 
@@ -381,39 +374,51 @@ store.TA.probs[,3]<- rep(rep(c("Discretized","von Mises","wrapped Cauchy"),
 store.TA.probs[,4]<- rep(1:3, each=3*max(behav.res.TA$bin))
 
 
-#initial values for von mises and wrapped cauchy distribs
+#initial values for von mises distrib
+param1<- seq(-pi, pi, length.out = 10)
+param2<- c(seq(0.1, 0.9, length.out = 5),
+           seq(1, 100, length.out = 5))
+
+VM.init.params<- expand.grid(param1, param2)
+
+#initial values for wrapped cauchy distrib
 param1<- seq(-pi, pi, length.out = 10)
 param2<- seq(0.1, 1, length.out = 10)
 
-TA.init.params<- expand.grid(param1, param2)
+WC.init.params<- expand.grid(param1, param2)
 
 
 for (i in 1:length(unique(behav.res$behav))) {
+  print(i)
+  
   behav.prop<- behav.res.TA %>% filter(behav == i) %>% dplyr::select(prop)
   
-  TA.vm.res<- matrix(NA, nrow(TA.init.params), 3)
-  colnames(TA.vm.res)<- c("param1","param2","value")
-  for (j in 1:nrow(TA.init.params)) {
-  TA.vm.fit<- optim(c(TA.init.params[j,1], TA.init.params[j,2]), vm.function.optim,
-                    probs = behav.prop$prop, method = "Nelder-Mead")
-  TA.vm.res[j,1:2]<- TA.vm.fit$par
-  TA.vm.res[j,3]<- TA.vm.fit$value
+  TA.vm.res<- matrix(NA, nrow(VM.init.params), 3)
+  colnames(TA.vm.res)<- c("param1","param2","MAE")
+  for (j in 1:nrow(VM.init.params)) {
+    param=c(VM.init.params[j,1], VM.init.params[j,2])
+    TA.vm.fit<- optim(par=param, vm.function.optim,
+                      probs = behav.prop$prop, method = "L-BFGS-B",
+                      lower=c(-pi,0.001),upper=c(pi,10000)) #box-constrained optimization
+    TA.vm.res[j,1:2]<- TA.vm.fit$par
+    TA.vm.res[j,3]<- TA.vm.fit$value
   }
   
-  TA.wc.res<- matrix(NA, nrow(TA.init.params), 3)
-  colnames(TA.wc.res)<- c("param1","param2","value")
-  for (k in 1:nrow(TA.init.params)) {
-  TA.wc.fit<- optim(c(TA.init.params[k,1], TA.init.params[k,2]), wc.function.optim,
-                    probs = behav.prop$prop, method = "Nelder-Mead")
-  TA.wc.res[k,1:2]<- TA.wc.fit$par
-  TA.wc.res[k,3]<- TA.wc.fit$value
+  TA.wc.res<- matrix(NA, nrow(WC.init.params), 3)
+  colnames(TA.wc.res)<- c("param1","param2","MAE")
+  for (k in 1:nrow(WC.init.params)) {
+    param=c(WC.init.params[k,1], WC.init.params[k,2])
+    TA.wc.fit<- optim(par=param, wc.function.optim,
+                      probs = behav.prop$prop, method = "Nelder-Mead")
+    TA.wc.res[k,1:2]<- TA.wc.fit$par
+    TA.wc.res[k,3]<- TA.wc.fit$value
   }
   
   ind<- which(store.TA.probs[,4] == i)
   store.TA.probs[ind,1]<- c(behav.prop$prop,
-                            vm.function(TA.vm.res[which.min(TA.vm.res[,"value"]),
+                            vm.function(TA.vm.res[which.min(TA.vm.res[,"MAE"]),
                                                      c("param1","param2")]),
-                            wc.function(TA.wc.res[which.min(TA.wc.res[,"value"]),
+                            wc.function(TA.wc.res[which.min(TA.wc.res[,"MAE"]),
                                                      c("param1","param2")]))
 }
 
@@ -423,46 +428,8 @@ store.TA.probs$behav<- factor(store.TA.probs$behav, levels = c(1:3))
 levels(store.TA.probs$behav)<- c("Encamped","Exploratory","Transit")
 
 
-#Turning Angle comparison
-ggplot(store.TA.probs, aes(x=bin, y=prop)) +
-  geom_area(aes(fill=source, color = source, group = source),
-            position = position_dodge(width = 0), stat="identity", alpha = 0.35) +
-  labs(x="Bins", y="Proportion") +
-  scale_fill_viridis_d() +
-  scale_color_viridis_d(guide = F) +
-  theme_bw() +
-  facet_wrap(~behav) +
-  guides(fill = guide_legend(title = "Distribution", override.aes = list(alpha = 1))) +
-  theme(axis.title = element_text(size = 16), axis.text = element_text(size = 12),
-        strip.text = element_text(size = 12, face = "bold"))
-
-
-
-
-###Evaluate results if turning angles ranged from 0 to 2pi instead of -pi to pi
-
-store.TA.probs<- matrix(NA, 3*3*max(behav.res.TA$bin), 4)  #3 behaviors for 3 sources of 8 bins
-colnames(store.TA.probs)<- c("prop", "bin", "source", "behav")
-store.TA.probs[,2]<- rep(1:max(behav.res.TA$bin), times=3*3)
-store.TA.probs[,3]<- rep(rep(c("Discretized","von Mises","wrapped Cauchy"),
-                             each=max(behav.res.TA$bin)), 3)
-store.TA.probs[,4]<- rep(1:3, each=3*max(behav.res.TA$bin))
-for (i in 1:length(unique(behav.res$behav))) {
-  behav.prop<- behav.res.TA %>% filter(behav == i) %>% dplyr::select(prop)
-  behav.prop$prop<- behav.prop$prop[c(5:8,1:4)]
-  TA.vm.fit<- optim(c(0,0.7), vm.function.optim, probs = behav.prop$prop, method = "Nelder-Mead")
-  TA.wc.fit<- optim(c(-pi,0.7), wc.function.optim, probs = behav.prop$prop, method = "Nelder-Mead")
-  
-  ind<- which(store.TA.probs[,4] == i)
-  store.TA.probs[ind,1]<- c(behav.prop$prop,
-                            vm.function(TA.vm.fit$par),
-                            wc.function(TA.wc.fit$par))
-}
-
-store.TA.probs<- as.data.frame(store.TA.probs)
-store.TA.probs$prop<- as.numeric(as.character(store.TA.probs$prop))
-store.TA.probs$behav<- factor(store.TA.probs$behav, levels = c(1:3))
-levels(store.TA.probs$behav)<- c("Encamped","Exploratory","Transit")
+#Check that all distribs sum to 1
+store.TA.probs %>% group_by(behav, source) %>% summarise(sum=sum(prop))
 
 #Turning Angle comparison
 ggplot(store.TA.probs, aes(x=bin, y=prop)) +
@@ -476,17 +443,6 @@ ggplot(store.TA.probs, aes(x=bin, y=prop)) +
   guides(fill = guide_legend(title = "Distribution", override.aes = list(alpha = 1))) +
   theme(axis.title = element_text(size = 16), axis.text = element_text(size = 12),
         strip.text = element_text(size = 12, face = "bold"))
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -683,29 +639,41 @@ store.TA.probs[,3]<- rep(rep(c("Discretized","von Mises","wrapped Cauchy"),
 store.TA.probs[,4]<- rep(1:3, each=3*max(behav.res.TA$bin))
 
 
-#initial values for von mises and wrapped cauchy distribs
+#initial values for von mises distrib
 param1<- seq(-pi, pi, length.out = 10)
-param2<- seq(-0.5, 0.5, length.out = 10)
+param2<- c(seq(0.1, 0.9, length.out = 5),
+           seq(1, 100, length.out = 5))
 
-TA.init.params<- expand.grid(param1, param2)
+VM.init.params<- expand.grid(param1, param2)
+
+#initial values for wrapped cauchy distrib
+param1<- seq(-pi, pi, length.out = 10)
+param2<- seq(0.1, 1, length.out = 10)
+
+WC.init.params<- expand.grid(param1, param2)
 
 
 for (i in 1:length(unique(behav.res$behav))) {
+  print(i)
+  
   behav.prop<- behav.res.TA %>% filter(behav == i) %>% dplyr::select(prop)
   
-  TA.vm.res<- matrix(NA, nrow(TA.init.params), 3)
-  colnames(TA.vm.res)<- c("param1","param2","value")
-  for (j in 1:nrow(TA.init.params)) {
-    TA.vm.fit<- optim(c(TA.init.params[j,1], TA.init.params[j,2]), vm.function.optim,
-                      probs = behav.prop$prop, method = "Nelder-Mead")
+  TA.vm.res<- matrix(NA, nrow(VM.init.params), 3)
+  colnames(TA.vm.res)<- c("param1","param2","MAE")
+  for (j in 1:nrow(VM.init.params)) {
+    param=c(VM.init.params[j,1], VM.init.params[j,2])
+    TA.vm.fit<- optim(par=param, vm.function.optim,
+                      probs = behav.prop$prop, method = "L-BFGS-B",
+                      lower=c(-pi,0.001),upper=c(pi,10000)) #box-constrained optimization
     TA.vm.res[j,1:2]<- TA.vm.fit$par
     TA.vm.res[j,3]<- TA.vm.fit$value
   }
   
-  TA.wc.res<- matrix(NA, nrow(TA.init.params), 3)
-  colnames(TA.wc.res)<- c("param1","param2","value")
-  for (k in 1:nrow(TA.init.params)) {
-    TA.wc.fit<- optim(c(TA.init.params[k,1], TA.init.params[k,2]), wc.function.optim,
+  TA.wc.res<- matrix(NA, nrow(WC.init.params), 3)
+  colnames(TA.wc.res)<- c("param1","param2","MAE")
+  for (k in 1:nrow(WC.init.params)) {
+    param=c(WC.init.params[k,1], WC.init.params[k,2])
+    TA.wc.fit<- optim(par=param, wc.function.optim,
                       probs = behav.prop$prop, method = "Nelder-Mead")
     TA.wc.res[k,1:2]<- TA.wc.fit$par
     TA.wc.res[k,3]<- TA.wc.fit$value
@@ -713,9 +681,9 @@ for (i in 1:length(unique(behav.res$behav))) {
   
   ind<- which(store.TA.probs[,4] == i)
   store.TA.probs[ind,1]<- c(behav.prop$prop,
-                            vm.function(TA.vm.res[which.min(TA.vm.res[,"value"]),
+                            vm.function(TA.vm.res[which.min(TA.vm.res[,"MAE"]),
                                                   c("param1","param2")]),
-                            wc.function(TA.wc.res[which.min(TA.wc.res[,"value"]),
+                            wc.function(TA.wc.res[which.min(TA.wc.res[,"MAE"]),
                                                   c("param1","param2")]))
 }
 
@@ -723,6 +691,10 @@ store.TA.probs<- as.data.frame(store.TA.probs)
 store.TA.probs$prop<- as.numeric(as.character(store.TA.probs$prop))
 store.TA.probs$behav<- factor(store.TA.probs$behav, levels = c(2,3,1))
 levels(store.TA.probs$behav)<- c("Resting","Encamped","Exploratory")
+
+
+#Check that all distribs sum to 1
+store.TA.probs %>% group_by(behav, source) %>% summarise(sum=sum(prop))
 
 
 #Turning Angle comparison

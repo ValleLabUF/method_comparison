@@ -47,7 +47,7 @@ res=LDA_behavior_gibbs(dat=obs, gamma1=gamma1, alpha=alpha,
                        ngibbs=ngibbs, nmaxclust=nmaxclust,
                        nburn=nburn, ndata.types=ndata.types)
 
-#Check traceplot of log marginal likelihood
+#Check traceplot of log likelihood
 plot(res$loglikel, type='l')
 
 #Extract and plot proportions of behaviors per time segment

@@ -22,10 +22,10 @@ setwd("~/Documents/Snail Kite Project/Data/R Scripts/ValleLabUF/method_compariso
 
 #load and manipulate data
 dat<- read.csv("CRW_HC_sim.csv", as.is = T)  #for hard-clustering sim
-# dat<- read.csv("CRW_MM_sim_2behav.csv", as.is = T)  #for mixed-membership sim
+# dat<- read.csv("CRW_MM_sim.csv", as.is = T)  #for mixed-membership sim
 dat$dt<- 3600
 dat$id<- 1
-dat.list<- df.to.list(dat=dat)
+dat.list<- df.to.list(dat=dat, ind = "id")
 names(dat)[3:4]<- c("dist","rel.angle")
 
 #filter data for tstep of interest
@@ -62,11 +62,8 @@ ggplot(behav.df, aes(x=rel.angle)) +
 
 
 #assign bins to obs
-for (i in 1:length(behav.list)) {
-  behav.list[[i]]<- behav.list[[i]] %>% assign.dist.bin(dist.bin.lims = dist.bin.lims) %>%
-    assign.rel_angle.bin(angle.bin.lims = angle.bin.lims)
-}
-
+behav.list<- map(behav.list, discrete_move_par, lims = list(dist.bin.lims, angle.bin.lims),
+                 varIn = c("dist", "rel.angle"), varOut = c("SL", "TA"))
 behav.list2<- lapply(behav.list, function(x) subset(x, select = c(id, SL, TA)))  #retain id and parameters on which to segment
 
 
@@ -89,7 +86,7 @@ param.prop[6:13, "value"]<- (diff(angle.bin.lims)/2) + angle.bin.lims[1:8]
 ggplot(data = param.prop %>% filter(key == "SL"), aes(value, prop)) +
   geom_bar(stat = "identity", width = (diff(dist.bin.lims)-0.025),
            fill = "lightblue", color = "black") +
-  # facet_zoom(xlim = c(0,5)) +
+  facet_zoom(xlim = c(0,5)) +
   labs(x = "Step Length", y = "Proportion") +
   theme_bw() +
   theme(panel.grid = element_blank(), axis.title = element_text(size = 16),
@@ -116,6 +113,7 @@ ngibbs = 40000
 
 plan(multisession)
 dat.res<- behavior_segment(data = behav.list2, ngibbs = ngibbs, nbins = c(5,8), alpha = alpha)
+plan(sequential)  #closes background workers
 #takes 9 min for 40000 iterations
 
 
@@ -133,7 +131,7 @@ brkpts<- getBreakpts(dat = dat.res$brkpts, ML = ML, identity = identity)
 
 ## Heatmaps
 plot.heatmap(data = behav.list, nbins = c(5,8), brkpts = brkpts, dat.res = dat.res,
-             type = "behav", title = T, legend = T)
+             type = "behav", title = F, legend = T)
 
 
 ## Compare True vs Modeled Breakpoints
@@ -145,7 +143,7 @@ all.brkpts<- data.frame(brks = c(true.brkpts, model.brkpts), type = rep(c("True"
                                                                           length(model.brkpts))))
 
 accuracy<- matrix(NA,length(model.brkpts),1)
-for (i in 1:length(model.brkpts)) {
+for (i in 1:length(model.brkpts)) {  #assign brkpts as accurate or inaccurate
   
   tmp<- c(model.brkpts[i] - (20:0), model.brkpts[i] + (1:20)) %in% true.brkpts %>% sum()
   
@@ -156,7 +154,7 @@ for (i in 1:length(model.brkpts)) {
   }
 }
 
-if (sum(abs(diff(model.brkpts)) < 20) >= 0) {
+if (sum(abs(diff(model.brkpts)) < 20) >= 0) {  #identify duplicate brkpts
   ind<- which(abs(diff(model.brkpts)) <= 20)
   ind<- sort(c(ind, ind+1))
 }
@@ -210,7 +208,7 @@ ggplot(all.brkpts, aes(x=brks, y=type, color = acc, shape = acc)) +
 
 ## Calculate percentage of each measure of breakpoint accuracy for summary
 
-all.brkpts %>% filter(type == "Model") %>% group_by(acc) %>% summarise(n=n()) %>%
+all.brkpts %>% filter(type == "Model") %>% group_by(acc) %>% tally() %>%
   mutate(freq = n/sum(n))
 
 
@@ -220,4 +218,4 @@ dat_out<- map(behav.list, assign.time.seg, brkpts = brkpts) %>% map_dfr(`[`)  #a
 
 #export results for hard-clustering and mixed-membership simulations
 # write.csv(dat_out, "CRW_HC_tsegs.csv", row.names = F)
-# write.csv(dat_out, "CRW_MM_tsegs_2behav.csv", row.names = F)
+# write.csv(dat_out, "CRW_MM_tsegs.csv", row.names = F)

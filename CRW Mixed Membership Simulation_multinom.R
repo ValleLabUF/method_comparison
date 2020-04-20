@@ -12,7 +12,7 @@ source('Simulation Functions.R')
 ### Simulate full track ###
 
 #define behaviors and randomly sample 50 (for 50 time segments)
-#weight probs so that behavior 1 (Resting) occurs 50%, behavior 2 (Exploratory) occurs 35%, and behavior 3 (Transit) occurs 15%
+#weight probs so that behavior 1 (Resting) occurs 50%, behavior 2 (Area-restricted search) occurs 35%, and behavior 3 (Transit) occurs 15%
 
 set.seed(9) #5
 
@@ -77,9 +77,9 @@ TA.params<- data.frame(mu=c(pi, pi, 0), rho = c(0.8, 0, 0.8))
 track<- CRW.sim(n=1, behav = behav.full, SL.params = SL.params, TA.params = TA.params, Z0=c(0,0))
 names(track)[5]<- "behav_fine"
 track$behav_fine<- factor(track$behav)
-levels(track$behav_fine)<- c("Resting","Exploratory","Transit")
+levels(track$behav_fine)<- c("Resting","ARS","Transit")
 track<- track %>% mutate(behav_coarse = c(NA, rep(behav, each=100)) %>% factor())
-levels(track$behav_coarse)<- c("Resting","Exploratory","Transit")
+levels(track$behav_coarse)<- c("Resting","ARS","Transit")
 
 true.brkpts<- which(diff(behav) != 0) * 100
 
@@ -126,6 +126,6 @@ ggplot(track, aes(TA)) +
 
 
 
-write.csv(track, "CRW_MM_sim.csv", row.names = F)
+write.csv(track, "CRW_MM_sim_multinom.csv", row.names = F)
 
 

@@ -136,8 +136,8 @@ plot.heatmap(data = behav.list, nbins = c(5,8), brkpts = brkpts, dat.res = dat.r
 
 ## Compare True vs Modeled Breakpoints
 model.brkpts<- na.omit(t(brkpts[-1])) %>% as.vector()
-true.brkpts<- which(diff(as.numeric(as.factor(dat$true.behav))) != 0) - 1  #for hard-clustering sim
-# true.brkpts<- which(diff(as.numeric(as.factor(dat$behav_coarse))) != 0) - 1  #for mixed-membership sim
+# true.brkpts<- which(diff(as.numeric(as.factor(dat$true.behav))) != 0) - 1  #for hard-clustering sim
+true.brkpts<- which(diff(as.numeric(as.factor(dat$behav_coarse))) != 0) - 1  #for mixed-membership sim
 all.brkpts<- data.frame(brks = c(true.brkpts, model.brkpts), type = rep(c("True","Model"),
                                                                         c(length(true.brkpts),
                                                                           length(model.brkpts))))
@@ -188,12 +188,12 @@ all.brkpts$acc<- accuracy
 all.brkpts<- rbind(all.brkpts, status.miss)
 
 #for hard-clustering
-ggplot(all.brkpts, aes(x=brks, y=type, color = acc)) +
-  geom_point(size=3) +
-  theme_bw() +
-  labs(x="Time", y="Type") +
-  theme(axis.title = element_text(size = 16), axis.text = element_text(size = 10), legend.position = "top") +
-  scale_color_manual("Accuracy", values = c("forestgreen","lightgreen","firebrick","black"))
+# ggplot(all.brkpts, aes(x=brks, y=type, color = acc)) +
+#   geom_point(size=3) +
+#   theme_bw() +
+#   labs(x="Time", y="Type") +
+#   theme(axis.title = element_text(size = 16), axis.text = element_text(size = 10), legend.position = "top") +
+#   scale_color_manual("Accuracy", values = c("forestgreen","lightgreen","firebrick","black"))
 
 # #for mixed-membership
 ggplot(all.brkpts, aes(x=brks, y=type, color = acc, shape = acc)) +
@@ -218,4 +218,4 @@ dat_out<- map(behav.list, assign.time.seg, brkpts = brkpts) %>% map_dfr(`[`)  #a
 
 #export results for hard-clustering and mixed-membership simulations
 # write.csv(dat_out, "CRW_HC_tsegs.csv", row.names = F)
-# write.csv(dat_out, "CRW_MM_tsegs.csv", row.names = F)
+# write.csv(dat_out, "CRW_MM_tsegs_multinom.csv", row.names = F)

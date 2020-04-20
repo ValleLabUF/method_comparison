@@ -24,8 +24,8 @@ sourceCpp('aux1.cpp')
 setwd("~/Documents/Snail Kite Project/Data/R Scripts/ValleLabUF/method_comparison")
 
 #get data
-dat<- read.csv("CRW_HC_tsegs.csv", as.is = T)  #hard clustering sim
-# dat<- read.csv("CRW_MM_tsegs.csv", as.is = T)  #mixed-membership sim
+# dat<- read.csv("CRW_HC_tsegs.csv", as.is = T)  #hard clustering sim
+dat<- read.csv("CRW_MM_tsegs.csv", as.is = T)  #mixed-membership sim
 dat.list<- df.to.list(dat)  #for later behavioral assignment
 nbins<- c(5,8)  #number of bins per param (in order)
 dat_red<- dat %>% dplyr::select(c(id, tseg, SL, TA))  #only keep necessary cols
@@ -83,8 +83,8 @@ theta.estim<- apply(theta.estim[,1:3], 1, function(x) x/sum(x)) %>% t()  #normal
 theta.estim<- data.frame(id = obs$id, tseg = obs$tseg, theta.estim)
 
 #DEFINE BEHAVIOR ORDER BASED ON HISTOGRAMS
-names(theta.estim)<- c("id", "tseg","Resting","Exploratory","Transit")  #for HC CRW
-# names(theta.estim)<- c("id", "tseg","Exploratory","Resting","Transit")  #for MM CRW
+# names(theta.estim)<- c("id", "tseg","Resting","ARS","Transit")  #for HC CRW
+names(theta.estim)<- c("id", "tseg","ARS","Resting","Transit")  #for MM CRW
 nobs<- data.frame(id = obs$id, tseg = obs$tseg, n = apply(obs[,3:7], 1, sum)) #calc obs per tseg using SL bins (more reliable than TA)
 
 #Create augmented matrix by replicating rows (tsegs) according to obs per tseg
@@ -95,29 +95,29 @@ theta.estim2<- aug_behav_df(dat = dat[-1,] %>% mutate(date=1:nrow(dat[-1,])),
 theta.estim.long<- theta.estim2 %>% gather(key, value, -id, -tseg, -time1, -date)
 names(theta.estim.long)[5:6]<- c("behavior","prop")
 theta.estim.long$behavior<- factor(theta.estim.long$behavior,
-                                   levels = c("Resting","Exploratory","Transit"))
+                                   levels = c("Resting","ARS","Transit"))
 
 
 #generate long form of true behavior for HARD CLUSTERING SIM
-true.behavior<- matrix(0, 2500, 3) %>% data.frame(., time1 = 1:2500)
-names(true.behavior)[1:3]<- c("Resting","Exploratory","Transit")
-ind<- factor(dat$true.behav[-1], levels = c("Resting","Exploratory","Transit")) %>% as.numeric()
-for(i in 1:nrow(true.behavior)) {
-  true.behavior[i, ind[i]]<- 1
-}
-true.behavior.long<- true.behavior %>% gather(key, value, -time1)
-names(true.behavior.long)[2:3]<- c("behavior","prop")
-true.behavior.long$behavior<- factor(true.behavior.long$behavior,
-                                     levels = c("Resting","Exploratory","Transit"))
+# true.behavior<- matrix(0, 2500, 3) %>% data.frame(., time1 = 1:2500)
+# names(true.behavior)[1:3]<- c("Resting","ARS","Transit")
+# ind<- factor(dat$true.behav[-1], levels = c("Resting","ARS","Transit")) %>% as.numeric()
+# for(i in 1:nrow(true.behavior)) {
+#   true.behavior[i, ind[i]]<- 1
+# }
+# true.behavior.long<- true.behavior %>% gather(key, value, -time1)
+# names(true.behavior.long)[2:3]<- c("behavior","prop")
+# true.behavior.long$behavior<- factor(true.behavior.long$behavior,
+#                                      levels = c("Resting","ARS","Transit"))
 
 
 
 #generate long form of true behavior for MIXED-MEMBERSHIP SIM
 true.behavior<- matrix(0, 5000, 3) %>% data.frame(., time1 = 1:5000)
-names(true.behavior)[1:3]<- c("Resting","Exploratory","Transit")
+names(true.behavior)[1:3]<- c("Resting","ARS","Transit")
 tseg<- rep(1:50, each = 100)
 tmp<- data.frame(behav = as.numeric(factor(dat$behav_fine[-1],
-                                           levels = c("Resting","Exploratory","Transit"))),
+                                           levels = c("Resting","ARS","Transit"))),
                  tseg = tseg)
 for(i in 1:(length(dat$behav_fine[-1])/100)) {
   tmp1<- tmp %>% filter(tseg == i) %>% dplyr::select(behav) %>% table()/100
@@ -129,7 +129,7 @@ for(i in 1:(length(dat$behav_fine[-1])/100)) {
 true.behavior.long<- true.behavior %>% gather(key, value, -time1)
 names(true.behavior.long)[2:3]<- c("behavior","prop")
 true.behavior.long$behavior<- factor(true.behavior.long$behavior,
-                                     levels = c("Resting","Exploratory","Transit"))
+                                     levels = c("Resting","ARS","Transit"))
 
 
 #Plot overlapping traces
@@ -158,9 +158,9 @@ ggplot(theta.estim.long) +
 
 #assign  behavior from sim to data
 dat2<- assign_behav(dat.list = dat.list, theta.estim2 = theta.estim2)
-dat2$behav<- factor(dat2$behav, levels = c("Resting","Exploratory","Transit"))
-dat2[,c("behav","prop")]<- dat2[c(2501,1:2500),c("behav","prop")]  #FOR HC SIM
-# dat2[,c("behav","prop")]<- dat2[c(5001,1:5000),c("behav","prop")]  #FOR MM SIM
+dat2$behav<- factor(dat2$behav, levels = c("Resting","ARS","Transit"))
+# dat2[,c("behav","prop")]<- dat2[c(2501,1:2500),c("behav","prop")]  #FOR HC SIM
+dat2[,c("behav","prop")]<- dat2[c(5001,1:5000),c("behav","prop")]  #FOR MM SIM
 
 ggplot() +
   geom_path(data = dat2, aes(x=x, y=y), color="gray60", size=0.25) +
@@ -198,11 +198,11 @@ mean(sq.err$sq.err)  #0.0197
 
 sq.err %>% group_by(behavior) %>% summarise(mse = mean(sq.err))
 #Resting: 0.0205
-#Exploratory: 0.0324
+#ARS: 0.0324
 #Transit: 0.0061
 
 
 
 #export results
 # write.csv(dat2, "Modeled HC Sim Tracks w Behav.csv", row.names = F)  #for hard-clustering sim
-# write.csv(dat2, "Modeled MM Sim Tracks w Behav.csv", row.names = F)  #for mixed-membership sim
+# write.csv(dat2, "Modeled MM Sim Tracks w Behav_multinom.csv", row.names = F)  #for mixed-membership sim

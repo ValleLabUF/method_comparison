@@ -11,13 +11,11 @@ dat_MM<- read.csv("Modeled MM Sim Tracks w Behav.csv", as.is = T)
 #### Simulated Data ####
 ########################
 
-sim_mixed$behav_fine<- factor(sim_mixed$behav_fine, levels = c("Resting", "Exploratory",
-                                                               "Transit"))
-sim_mixed$behav_coarse<- factor(sim_mixed$behav_coarse, levels = c("Resting", "Exploratory",
-                                                               "Transit"))
-sim_mixed$HMM.state<- factor(sim_mixed$HMM.state, levels = c("Resting", "Exploratory",
-                                                               "Transit"))
-dat_MM$behav<- factor(dat_MM$behav, levels = c("Resting", "Exploratory", "Transit"))
+sim_mixed$behav_fine<- factor(sim_mixed$behav_fine, levels = c("Resting", "ARS", "Transit"))
+sim_mixed$behav_coarse<- factor(sim_mixed$behav_coarse, levels = c("Resting", "ARS", "Transit"))
+sim_mixed$hmm<- factor(sim_mixed$hmm, levels = 1:3)
+levels(sim_mixed$hmm)<- c("Resting", "ARS", "Transit")
+dat_MM$behav<- factor(dat_MM$behav, levels = c("Resting", "ARS", "Transit"))
 
 sim_mixed<- sim_mixed[!is.na(sim_mixed$behav_fine),]
 
@@ -28,17 +26,17 @@ sim_mixed<- sim_mixed[!is.na(sim_mixed$behav_fine),]
 #Fine-scale
 true.b.fine<- sim_mixed$behav_fine %>%
   as.numeric()
-hmm.b<- sim_mixed$HMM.state %>%
+hmm.b<- sim_mixed$hmm %>%
   as.numeric()
 
-(which(true.b.fine == hmm.b) %>% length()) / length(true.b.fine)  #92.4% accurate
+(which(true.b.fine == hmm.b) %>% length()) / length(true.b.fine)  #91.4% accurate
 
 
 #Coarse-scale
 true.b.coarse<- sim_mixed$behav_coarse %>%
   as.numeric()
 
-(which(true.b.coarse == hmm.b) %>% length()) / length(true.b.coarse)  #85.8% accurate
+(which(true.b.coarse == hmm.b) %>% length()) / length(true.b.coarse)  #87.5% accurate
 
 
 
@@ -69,7 +67,7 @@ model.b<- dat_MM$behav[-1] %>%
 
 ggplot() +
   geom_path(data = sim_mixed, aes(x=x, y=y), color="gray60", size=0.25) +
-  geom_point(data = sim_mixed, aes(x, y, fill=HMM.state), size=2.5, pch=21) +
+  geom_point(data = sim_mixed, aes(x, y, fill=hmm), size=2.5, pch=21) +
   scale_fill_viridis_d("Behavior") +
   geom_point(data = sim_mixed[1,], aes(x, y), color = "green", pch = 21, size = 3,
              stroke = 1.25) +

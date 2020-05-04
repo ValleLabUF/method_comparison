@@ -8,54 +8,58 @@ library(raster)        #for raster manipulation
 library(rgdal)         #for shp data, projections; version 1.3-4 used
 library(adehabitatLT)  #for interpreting trajectories
 library(momentuHMM)
-library(dplyr)
-library(tictoc)
+library(tidyverse)
+
+setwd("~/Documents/Snail Kite Project/Data/R Scripts/ValleLabUF/git_segmentation_behavior")
+source('helper functions.R')
+
+setwd("~/Documents/Snail Kite Project/Data/R Scripts/ValleLabUF/method_comparison")
 
 #------------------------------#
 #Hidden Markov model
 #------------------------------#
 
-da<-track
-da$time <- seq(c(ISOdate(2020,3,20)), by = "hour", length.out = 5001)#create fake hourly times for BCPA
+d<- read.csv("CRW_MM_sim_multinom.csv", as.is = T)
+names(d)[1]<- "ID"
+d.list<- df.to.list(d, ind = "ID")
+d.list<- map(d.list, ~mutate(., time = seq(c(ISOdate(2020,5,4)), by = "hour",
+                                           length.out = n())))  #create fake hourly times
 
-da$time<- as.POSIXct(da$time, format = "%Y/%m/%d %H:%M:%S")
-utmcoord <- SpatialPoints(da[,1:2])
-da$x<-attr(utmcoord,"coords")[,1]
-da$y<-attr(utmcoord,"coords")[,2]
+#format data
+move.d<- map(d.list, ~prepData(.[,1:3], type = "UTM", coordNames = c("x","y")))
 
-#format
-move.d <- prepData(data.frame(ID=1, x = da$x, y = da$y), 
-                   type="UTM", coordNames = c("x","y"))#assigned an id of 1 because it's one track
-#check data
-plot(y~x, data=move.d, type="o", col="gray65", asp=1, cex=0, pch=19, xlab="Longitude",ylab="Latitude")
+#Plot tracks
+par(mfrow=c(2,2), ask=T)
+for (i in 1:length(move.d)) {
+  plot(y~x, data = move.d[[i]], main = paste("ID",names(d.list)[i]), type="o", col="gray65",
+       asp=1, cex=0, pch=19, xlab="Longitude",ylab="Latitude")
+}
+par(mfrow=c(1,1), ask=F)
 
-#choose starting values from data
-hist(move.d$step, col = 'skyblue4', breaks = 50)
-mean(move.d$step, na.rm=T);sd(move.d$step, na.rm=T)
-acf(move.d$step[!is.na(move.d$step)])
-hist(move.d$angle, col = 'purple', breaks = 50)
 
-#zero distances-needed for 'zermass0' starting values
-whichzero <- which(move.d$step == 0)
-propzero <- length(whichzero)/nrow(move.d)
-stateNames <- c("Resting","ARS","Transit")
 
 ### Test with 2-4 behavioral states and then perform order selection via AIC/BIC
 
-set.seed(12345)
-# Empty list for order selection
-k.models<- list()
+set.seed(2)
 
 
-tic()
-## K = 2
+hmm.res<- list()
 
-# Set number of iterations, save list of fitted models, and name behavioral states
-niter <- 50
-allm <- list()
-stateNames <- c("Encamped","Exploratory")
-for(i in 1:niter) {
-  print(i)
+for (j in seq_along(move.d)) {
+  
+  start.time<- Sys.time()
+  
+  # Empty list for order selection
+  k.models<- list()
+  
+  
+  ## K = 2
+  print(paste("Simulation", j))
+  
+  stateNames <- c("Encamped","Exploratory")
+  whichzero <- which(move.d[[j]]$step == 0)
+  propzero <- length(whichzero)/nrow(move.d[[j]])
+  zeromass0 <- c(propzero, 0.05)        #for zero distances by state
   
   # Step length mean
   stepMean0 <- runif(2,
@@ -72,40 +76,30 @@ for(i in 1:niter) {
                      min = c(0.4, 0.5),
                      max = c(0.99, 0.99))
   # Fit model
-  stepPar0 <- c(stepMean0, stepSD0)
+  if(propzero > 0) {  #don't include zero mass if no 0s present
+    stepPar0 <- c(stepMean0, stepSD0, zeromass0)
+  } else {
+    stepPar0 <- c(stepMean0, stepSD0)
+  }
   anglePar0 <- c(angleMean0,angleCon0)
-  allm[[i]] <- fitHMM(data = move.d, nbStates = 2, 
-                      Par0 = list(step = stepPar0, angle = anglePar0),
-                      dist = list(step = "gamma", angle = "wrpcauchy"),
-                      formula = ~ 1, stationary=TRUE, #stationary for a slightly better fit
-                      estAngleMean = list(angle=TRUE),
-                      stateNames = stateNames)
-}
-
-# Extract likelihoods of fitted models
-allnllk <- unlist(lapply(allm, function(m) m$mod$minimum))
-
-# Index of best fitting model (smallest negative log-likelihood)
-whichbest <- which.min(allnllk)
-
-# Best fitting model
-k.models[[1]] <- allm[[whichbest]]
-
-
-
-
-
-
-
-## K = 3
-
-# Set number of iterations, save list of fitted models, and name behavioral states
-niter <- 50
-allm <- list()
-stateNames <- c("Resting","ARS","Transit")
-
-for(i in 1:niter) {
-  print(i)
+  k.models[[1]] <- fitHMM(data = move.d[[j]], nbStates = 2, 
+                          Par0 = list(step = stepPar0, angle = anglePar0),
+                          dist = list(step = "gamma", angle = "wrpcauchy"),
+                          formula = ~ 1, stationary=TRUE, #stationary for a slightly better fit
+                          estAngleMean = list(angle=TRUE),
+                          stateNames = stateNames,
+                          retryFits = 30)
+  
+  
+  
+  
+  ## K = 3
+  print(paste("Simulation", j))
+  
+  stateNames <- c("Resting","ARS","Transit")
+  whichzero <- which(move.d[[j]]$step == 0)
+  propzero <- length(whichzero)/nrow(move.d[[j]])
+  zeromass0 <- c(propzero, 0.01, 0.05)        #for zero distances by state
   
   # Step length mean
   stepMean0 <- runif(3,
@@ -122,42 +116,31 @@ for(i in 1:niter) {
                      min = c(0.4, 0.01, 0.5),
                      max = c(0.99, 0.3, 0.99))
   # Fit model
-  stepPar0 <- c(stepMean0, stepSD0)
+  if(propzero > 0) {  #don't include zero mass if no 0s present
+    stepPar0 <- c(stepMean0, stepSD0, zeromass0)
+  } else {
+    stepPar0 <- c(stepMean0, stepSD0)
+  }
   anglePar0 <- c(angleMean0,angleCon0)
-  allm[[i]] <- fitHMM(data = move.d, nbStates = 3, 
-                      Par0 = list(step = stepPar0, angle = anglePar0),
-                      dist = list(step = "gamma", angle = "wrpcauchy"),
-                      formula = ~ 1, stationary=TRUE, #stationary for a slightly better fit
-                      estAngleMean = list(angle=TRUE),
-                      stateNames = stateNames)
-}
-
-
-# Extract likelihoods of fitted models
-allnllk <- unlist(lapply(allm, function(m) m$mod$minimum))
-
-# Index of best fitting model (smallest negative log-likelihood)
-whichbest <- which.min(allnllk)
-
-# Best fitting model
-k.models[[2]] <- allm[[whichbest]]
-
-
-
-
-
-
-
-
-## K = 4
-
-# Set number of iterations, save list of fitted models, and name behavioral states
-niter <- 50
-allm <- list()
-stateNames <- c("Resting","ARS","Exploratory","Transit")
-
-for(i in 1:niter) {
-  print(i)
+  k.models[[2]] <- fitHMM(data = move.d[[j]], nbStates = 3, 
+                          Par0 = list(step = stepPar0, angle = anglePar0),
+                          dist = list(step = "gamma", angle = "wrpcauchy"),
+                          formula = ~ 1, stationary=TRUE, #stationary for a slightly better fit
+                          estAngleMean = list(angle=TRUE),
+                          stateNames = stateNames,
+                          retryFits = 30)
+  
+  
+  
+  
+  
+  ## K = 4
+  print(paste("Simulation", j))
+  
+  stateNames <- c("Resting","ARS","Exploratory","Transit")
+  whichzero <- which(move.d[[j]]$step == 0)
+  propzero <- length(whichzero)/nrow(move.d[[j]])
+  zeromass0 <- c(propzero, 0.01, 0.03, 0.05)        #for zero distances by state
   
   # Step length mean
   stepMean0 <- runif(4,
@@ -174,62 +157,88 @@ for(i in 1:niter) {
                      min = c(0.4, 0.01, 0.01, 0.5),
                      max = c(0.99, 0.5, 0.5, 0.99))
   # Fit model
-  stepPar0 <- c(stepMean0, stepSD0)
+  if(propzero > 0) {  #don't include zero mass if no 0s present
+    stepPar0 <- c(stepMean0, stepSD0, zeromass0)
+  } else {
+    stepPar0 <- c(stepMean0, stepSD0)
+  }
   anglePar0 <- c(angleMean0,angleCon0)
-  allm[[i]] <- fitHMM(data = move.d, nbStates = 4, 
-                      Par0 = list(step = stepPar0, angle = anglePar0),
-                      dist = list(step = "gamma", angle = "wrpcauchy"),
-                      formula = ~ 1, stationary=TRUE, #stationary for a slightly better fit
-                      estAngleMean = list(angle=TRUE),
-                      stateNames = stateNames)
+  k.models[[3]] <- fitHMM(data = move.d[[j]], nbStates = 4, 
+                          Par0 = list(step = stepPar0, angle = anglePar0),
+                          dist = list(step = "gamma", angle = "wrpcauchy"),
+                          formula = ~ 1, stationary=TRUE, #stationary for a slightly better fit
+                          estAngleMean = list(angle=TRUE),
+                          stateNames = stateNames,
+                          retryFits = 30)
+  
+  
+  
+  end.time<- Sys.time()
+  elapsed.time<- difftime(end.time, start.time, units = "min")
+  
+  hmm.res[[j]]<- list(models = k.models, elapsed.time = elapsed.time)
 }
 
+names(hmm.res)<- names(move.d)
 
-# Extract likelihoods of fitted models
-allnllk <- unlist(lapply(allm, function(m) m$mod$minimum))
-
-# Index of best fitting model (smallest negative log-likelihood)
-whichbest <- which.min(allnllk)
-
-# Best fitting model
-k.models[[3]] <- allm[[whichbest]]
-
-toc()
 
 
 ## View output from each model and inspect pseudo-residuals
-plot(k.models[[1]]); plotPR(k.models[[1]])
-plot(k.models[[2]]); plotPR(k.models[[2]])
-plot(k.models[[3]]); plotPR(k.models[[3]])
 
+for (i in 1:length(hmm.res)) {
+  plot(hmm.res[[i]]$models[[1]])
+  plot(hmm.res[[i]]$models[[2]])
+  plot(hmm.res[[i]]$models[[3]])
+}
+
+for (i in 1:length(hmm.res)) {
+  plotPR(hmm.res[[i]]$models[[1]])
+  plotPR(hmm.res[[i]]$models[[2]])
+  plotPR(hmm.res[[i]]$models[[3]])
+}
 
 
 ## Make inference via AIC
-k.2<- k.models[[1]]  # 2 states
-k.3<- k.models[[2]]  # 3 states  
-k.4<- k.models[[3]]  # 4 states
-
-AIC(k.2, k.3, k.4)
-AICweights(k.2, k.3, k.4)  #4 states is far and away the best model
-
+for (i in 1:length(hmm.res)) {
+  k.2<- hmm.res[[i]]$models[[1]]  # 2 states
+  k.3<- hmm.res[[i]]$models[[2]]  # 3 states  
+  k.4<- hmm.res[[i]]$models[[3]]  # 4 states
+  
+  print(names(hmm.res)[i])
+  print(AIC(k.2, k.3, k.4))
+  print(AICweights(k.2, k.3, k.4))  #4 states is far and away the best model
+}
 
 ## Make inference via BIC
 # BIC = -2*logL + p*log(T)
 
-#K=2
-(2*k.2$mod$minimum) + (length(k.2$mod$estimate)*log(nrow(da)))  #25731.71
-#K=3
-(2*k.3$mod$minimum) + (length(k.3$mod$estimate)*log(nrow(da)))  #23150.92
-#K=4
-(2*k.4$mod$minimum) + (length(k.4$mod$estimate)*log(nrow(da)))  #22829.74; BEST
+for (i in 1:length(hmm.res)) {
+  
+  k.2<- hmm.res[[i]]$models[[1]]  # 2 states
+  k.3<- hmm.res[[i]]$models[[2]]  # 3 states  
+  k.4<- hmm.res[[i]]$models[[3]]  # 4 states
+  
+  print(names(hmm.res)[i])
+  #K=2
+  print(2*k.2$mod$minimum) + (length(k.2$mod$estimate)*log(nrow(d.list[[i]])))  
+  #K=3
+  print(2*k.3$mod$minimum) + (length(k.3$mod$estimate)*log(nrow(d.list[[i]])))  
+  #K=4
+  print(2*k.4$mod$minimum) + (length(k.4$mod$estimate)*log(nrow(d.list[[i]])))  
+}
+
+# Identify K per AIC, BIC, and plots of density distributions
+k.optim<- c(3, 4, 3, 3, 4,
+            2, 2, 2, 2, 2,
+            2, 2, 2, 2, 2,
+            2, 2, 2, 2, 2)
 
 
 ### Sticking w/ K=3
 
-#examine, plot
-plot(k.3)
-plotStates(k.3, ask = FALSE)
+hmm.states<- hmm.res %>% 
+  map(., ~pluck(., 1, 2)) %>% 
+  map(viterbi) %>% 
+  map2(d.list, ., ~cbind(.x, hmm.state = c(NA, .y[-length(.y)])))
 
-ss<-viterbi(k.3)[1:5000]  #extract states
-fin<-cbind(da, hmm = c(NA, ss))
-write.csv(fin,"Sim2 mixed hmm.csv")
+write.csv(hmm.states,"HMM results.csv")

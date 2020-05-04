@@ -14,6 +14,7 @@ library(rnaturalearth)
 library(rnaturalearthdata)
 library(sf)
 library(viridis)
+library(ggnewscale)
 
 
 source('LDA_behavior_function.R')
@@ -24,9 +25,8 @@ sourceCpp('aux1.cpp')
 setwd("~/Documents/Snail Kite Project/Data/R Scripts/ValleLabUF/method_comparison")
 
 #get data
-# dat<- read.csv("CRW_HC_tsegs.csv", as.is = T)  #hard clustering sim
 dat<- read.csv("CRW_MM_tsegs.csv", as.is = T)  #mixed-membership sim
-dat.list<- df.to.list(dat)  #for later behavioral assignment
+dat.list<- df.to.list(dat, ind = "id")  #for later behavioral assignment
 nbins<- c(5,8)  #number of bins per param (in order)
 dat_red<- dat %>% dplyr::select(c(id, tseg, SL, TA))  #only keep necessary cols
 obs<- get.summary.stats_behav(dat = dat_red, nbins = nbins)  #to run Gibbs sampler on
@@ -43,106 +43,161 @@ gamma1=0.1
 alpha=0.1
 
 #run Gibbs sampler
-res=LDA_behavior_gibbs(dat=obs, gamma1=gamma1, alpha=alpha,
-                       ngibbs=ngibbs, nmaxclust=nmaxclust,
-                       nburn=nburn, ndata.types=ndata.types)
+obs.list<- df.to.list(obs, "id")
+res<- list()
+for (i in 1:length(obs.list)) {
+  res[[i]]=LDA_behavior_gibbs(dat=obs.list[[i]], gamma1=gamma1, alpha=alpha,
+                              ngibbs=ngibbs, nmaxclust=nmaxclust,
+                              nburn=nburn, ndata.types=ndata.types)
+}
 
 #Check traceplot of log likelihood
-plot(res$loglikel, type='l')
+par(mfrow=c(2,2), ask = T)
+for (i in 1:length(res)) {
+plot(res[[i]]$loglikel, type='l', main = paste("ID",names(obs.list)[i]))
+}
+par(mfrow=c(1,1), ask=F)
+
 
 #Extract and plot proportions of behaviors per time segment
-theta.post<- res$theta[(nburn+1):ngibbs,]  #extract samples from posterior
-theta.estim<- theta.post %>% apply(2, mean) %>% matrix(nrow(obs), nmaxclust) #calc mean of posterior
-boxplot(theta.estim, xlab="Behavior", ylab="Proportion of Total Behavior")
+theta.post<- map(res, pluck, "theta") %>% 
+  map(., function(x) x[(nburn+1):ngibbs,])  #extract samples from posterior
+theta.estim<- theta.post %>% 
+  map(., colMeans) %>% 
+  map(., ~matrix(., ncol = nmaxclust)) #calc mean of posterior
+
+#boxplots
+par(mfrow=c(2,2), ask = T)
+for (i in 1:length(res)) {
+  boxplot(theta.estim[[i]], xlab="Behavior", ylab="Proportion of Total Behavior",
+          main = paste("ID",names(obs.list)[i]))
+}
+par(mfrow=c(1,1), ask=F)
 
 #Determine proportion of behaviors (across all time segments)
 #Possibly set threshold below which behaviors are excluded
-round(apply(theta.estim, 2, sum)/nrow(theta.estim), digits = 3)
-
+map(theta.estim, function(x) round(colSums(x)/nrow(x), digits = 3))
 
 ## Viz histograms from model
-behav.res<- get_behav_hist(res = res, dat_red = dat_red)
-behav.res<- behav.res[behav.res$behav <=3,]  #only select the top 3 behaviors
+behav.res<- map(res, get_behav_hist, dat_red = dat_red) %>% 
+    map(., function(x) x[x$behav <= 3,])  #only select the top 3 behaviors
+
 
 #Plot histograms of proportion data; order color scale from slow to fast
-ggplot(behav.res, aes(x = bin, y = prop, fill = as.factor(behav))) +
-  geom_bar(stat = 'identity') +
-  labs(x = "\nBin", y = "Proportion\n") +
-  theme_bw() +
-  theme(axis.title = element_text(size = 16), axis.text.y = element_text(size = 14),
-        axis.text.x.bottom = element_text(size = 12),
-        strip.text = element_text(size = 14), strip.text.x = element_text(face = "bold")) +
-  scale_fill_manual(values = viridis(n=3), guide = F) +
-  facet_grid(param ~ behav, scales = "fixed")
+par(ask=T)
+for (i in 1:length(behav.res)) {
+  print(
+  ggplot(behav.res[[i]], aes(x = bin, y = prop, fill = as.factor(behav))) +
+    geom_bar(stat = 'identity') +
+    labs(x = "\nBin", y = "Proportion\n", title = names(obs.list)[i]) +
+    theme_bw() +
+    theme(axis.title = element_text(size = 16), axis.text.y = element_text(size = 14),
+          axis.text.x.bottom = element_text(size = 12),
+          strip.text = element_text(size = 14), strip.text.x = element_text(face = "bold")) +
+    scale_fill_manual(values = viridis(n=3), guide = F) +
+    facet_grid(param ~ behav, scales = "fixed")
+  )
+}
+par(ask=F)
 
 
 
 ## Viz behavior over time
 #Assign behaviors (via theta) to each time segment
-theta.estim<- apply(theta.estim[,1:3], 1, function(x) x/sum(x)) %>% t()  #normalize probs for only first 3 behaviors being used
-theta.estim<- data.frame(id = obs$id, tseg = obs$tseg, theta.estim)
+theta.estim<- map(theta.estim, . %>% 
+      as.data.frame() %>%  #convert to DF
+      dplyr::select(., 1:3) %>%   #only select 1st three behaviors (cols)
+      mutate(row_sum = rowSums(.)) %>%  #calculate sum of these behavior proportions
+      mutate_at(1:3, ~ ./row_sum) %>%  #normalize proportions for 3 behaviors
+      dplyr::select(-row_sum) %>%  #remove row_sum col
+      mutate(tseg = 1:nrow(.)) %>%  #add col for time segment
+      rename('1' = V1, '2' = V2, '3' = V3) %>%  #rename cols as numbers
+      dplyr::select(tseg, 1, 2, 3))  #reorder cols
+names(theta.estim)<- names(obs.list)
+# theta.estim<- data.frame(id = obs$id, tseg = obs$tseg, theta.estim)
 
-#DEFINE BEHAVIOR ORDER BASED ON HISTOGRAMS
-# names(theta.estim)<- c("id", "tseg","Resting","ARS","Transit")  #for HC CRW
-names(theta.estim)<- c("id", "tseg","ARS","Resting","Transit")  #for MM CRW
-nobs<- data.frame(id = obs$id, tseg = obs$tseg, n = apply(obs[,3:7], 1, sum)) #calc obs per tseg using SL bins (more reliable than TA)
+
+#calc obs per tseg using SL bins (more reliable than TA)
+nobs.list<- map(obs.list, . %>% 
+                  mutate(n = rowSums(dplyr::select(., str_subset(names(.), pattern = "y1")))) %>%
+                  dplyr::select(., -c(str_subset(names(.), pattern = "y")))) 
+
 
 #Create augmented matrix by replicating rows (tsegs) according to obs per tseg
-theta.estim2<- aug_behav_df(dat = dat[-1,] %>% mutate(date=1:nrow(dat[-1,])),
-                            theta.estim = theta.estim, nobs = nobs)
+theta.estim2<- list()
+for (i in 1:length(dat.list)) {
+  theta.estim2[[i]]<- dat.list[[i]] %>% 
+    drop_na(behav_fine) %>% 
+    mutate(date=time1-1) %>% 
+    aug_behav_df(dat = .,
+                 theta.estim = theta.estim[[i]],
+                 nobs = nobs.list[[i]])
+}
+
+
+
+#Need to manually inspect all histograms and assign proper order (slowest to fastest)
+behav.order<- list(c(3,1,2), c(2,1,3), c(3,2,1), c(2,1,3), c(3,2,1),
+                   c(2,3,1), c(1,3,2), c(2,1,3), c(2,3,1), c(2,3,1),
+                   c(2,3,1), c(2,1,3), c(2,1,3), c(1,2,3), c(1,3,2),
+                   c(3,1,2), c(2,1,3), c(2,3,1), c(3,2,1), c(3,1,2))
+names(behav.order)<- names(theta.estim)
+
 
 #Change into long format
-theta.estim.long<- theta.estim2 %>% gather(key, value, -id, -tseg, -time1, -date)
-names(theta.estim.long)[5:6]<- c("behavior","prop")
-theta.estim.long$behavior<- factor(theta.estim.long$behavior,
-                                   levels = c("Resting","ARS","Transit"))
+theta.estim.long<- list()
+for (i in 1:length(theta.estim2)) {
+  theta.estim.long[[i]]<- theta.estim2[[i]] %>% 
+    pivot_longer(cols = c(-tseg, -time1, -date), values_to = "prop", names_to = "behavior") %>% 
+    mutate_at("behavior", as.factor) %>% 
+    mutate_at("behavior", ~recode(., 'X1' = behav.order[[i]][1],
+                                  'X2' = behav.order[[i]][2], 'X3' = behav.order[[i]][3]))
+}
 
 
-#generate long form of true behavior for HARD CLUSTERING SIM
-# true.behavior<- matrix(0, 2500, 3) %>% data.frame(., time1 = 1:2500)
-# names(true.behavior)[1:3]<- c("Resting","ARS","Transit")
-# ind<- factor(dat$true.behav[-1], levels = c("Resting","ARS","Transit")) %>% as.numeric()
-# for(i in 1:nrow(true.behavior)) {
-#   true.behavior[i, ind[i]]<- 1
-# }
-# true.behavior.long<- true.behavior %>% gather(key, value, -time1)
-# names(true.behavior.long)[2:3]<- c("behavior","prop")
-# true.behavior.long$behavior<- factor(true.behavior.long$behavior,
-#                                      levels = c("Resting","ARS","Transit"))
 
 
 
 #generate long form of true behavior for MIXED-MEMBERSHIP SIM
-true.behavior<- matrix(0, 5000, 3) %>% data.frame(., time1 = 1:5000)
-names(true.behavior)[1:3]<- c("Resting","ARS","Transit")
-tseg<- rep(1:50, each = 100)
-tmp<- data.frame(behav = as.numeric(factor(dat$behav_fine[-1],
-                                           levels = c("Resting","ARS","Transit"))),
-                 tseg = tseg)
-for(i in 1:(length(dat$behav_fine[-1])/100)) {
-  tmp1<- tmp %>% filter(tseg == i) %>% dplyr::select(behav) %>% table()/100
-  mat<- matrix(0, 1, 3)
-  mat[,as.numeric(names(tmp1))]<- tmp1
-  mat1<- matrix(mat, 100, 3, byrow = T)
-  true.behavior[which(tmp$tseg == i), 1:3]<- mat1
+true.behavior.long<- map(dat.list, . %>% 
+                           drop_na("behav_fine") %>% 
+                           mutate(true.tseg = rep(1:(track_length[1]/100), each = 100)) %>% 
+                           mutate_at("behav_fine", as.factor) %>% 
+                           group_by(true.tseg, behav_fine) %>% 
+                           count(behav_fine, .drop = FALSE) %>% 
+                           mutate(prop = n/100) %>% 
+                           rename(behavior = behav_fine) %>% 
+                           map_df(., rep, 100) %>% 
+                           arrange(true.tseg) %>% 
+                           mutate(time1 = rep(1:(nrow(.)/3), each = 3)))
+
+
+## Plot traces of true and modeled behavior proportions across time segments
+par(ask=T)
+for (i in 1:length(behav.res)) {
+  print(
+    #Plot overlapping traces
+    ggplot() +
+      geom_line(data = theta.estim.long[[i]],
+                aes(x=date, y=prop, color = as.character(behavior)),
+                size = 1) +
+      scale_color_manual(values = viridis(n=20)[c(1,9,18)], guide=F) +
+      new_scale_color() +
+      geom_line(data = true.behavior.long[[i]],
+                aes(x=time1, y=prop, color = as.character(behavior)),
+                size = 0.55) +
+      scale_color_manual(values = viridis(n=20)[c(7,13,20)], guide=F) +
+      labs(x = "\nObservation", y = "Proportion of Behavior\n", title = names(obs.list)[i]) +
+      theme_bw() +
+      theme(axis.title = element_text(size = 16),
+            axis.text = element_text(size = 14),
+            strip.text = element_text(size = 12, face = "bold")) +
+      scale_y_continuous(breaks = c(0, 0.5, 1), limits = c(0,1)) +
+      facet_wrap(~behavior, nrow = 3)
+  )
 }
-true.behavior.long<- true.behavior %>% gather(key, value, -time1)
-names(true.behavior.long)[2:3]<- c("behavior","prop")
-true.behavior.long$behavior<- factor(true.behavior.long$behavior,
-                                     levels = c("Resting","ARS","Transit"))
+par(ask=F)
 
-
-#Plot overlapping traces
-ggplot(theta.estim.long) +
-  geom_line(aes(x=time1, y=prop, color = behavior), size = 1) +
-  geom_line(data = true.behavior.long, aes(x=time1, y=prop, color=behavior), size = 0.5) +
-  labs(x = "\nObservation", y = "Proportion of Behavior\n") +
-  scale_color_viridis_d("Behavior", guide=F) +
-  theme_bw() +
-  theme(axis.title = element_text(size = 16), axis.text.y = element_text(size = 14),
-        axis.text.x.bottom = element_text(size = 12)) +
-  scale_x_continuous(breaks = c(0, 2000, 4000)) +
-  facet_wrap(~behavior)
 
 #Plot scatterplot and compare to 1:1 line
 # scatter.prop.comp<- data.frame(behavior = theta.estim.long$behavior,
@@ -156,53 +211,45 @@ ggplot(theta.estim.long) +
 #   facet_wrap(~behavior)
 
 
-#assign  behavior from sim to data
-dat2<- assign_behav(dat.list = dat.list, theta.estim2 = theta.estim2)
-dat2$behav<- factor(dat2$behav, levels = c("Resting","ARS","Transit"))
-# dat2[,c("behav","prop")]<- dat2[c(2501,1:2500),c("behav","prop")]  #FOR HC SIM
-dat2[,c("behav","prop")]<- dat2[c(5001,1:5000),c("behav","prop")]  #FOR MM SIM
+#assign behavior from sim to data
+dat2<- list()
+for (i in 1:length(theta.estim2)) {  #assign behaviors to all obs
+  theta.estim2[[i]]<- cbind(id = names(theta.estim)[i], theta.estim2[[i]])
+  names(theta.estim2[[i]])[3:5]<- behav.order[[i]]
+  dat2[[i]]<- assign_behav(dat.list = dat.list[i], theta.estim2 = theta.estim2[[i]])
+}
 
-ggplot() +
-  geom_path(data = dat2, aes(x=x, y=y), color="gray60", size=0.25) +
-  geom_point(data = dat2[-1,], aes(x, y, fill=behav), size=2.5, pch=21,
-             alpha=dat2$prop[-nrow(dat2)]) +
+dat2<- map(dat2, . %>%  #reorder rows for behav and prop cols
+            mutate_at(vars(behav, prop), function(x) x[c(length(x),1:(length(x)-1))])) %>%
+  map_dfr(`[`)
+
+
+## Plot tracks with modeled behaviors
+
+ggplot(data = dat2 %>%
+         group_by(id) %>%
+         slice(2:n()) %>%
+         ungroup(), aes(x,y)) +
+  geom_path(color = "gray75") +
+  geom_point(aes(fill=behav), pch = 21, size = 2.5, alpha = 0.7) +
+  geom_point(data = dat2 %>%
+               group_by(id) %>%
+               slice(which(row_number() == 1)) %>%
+               ungroup(), aes(x, y), color = "green", pch = 21, size = 3, stroke = 1.25) +
+  geom_point(data = dat2 %>%
+               group_by(id) %>%
+               slice(which(row_number() == n())) %>%
+               ungroup(), aes(x, y), color = "red", pch = 24, size = 3, stroke = 1.25) +
   scale_fill_viridis_d("Behavior") +
-  geom_point(data = dat2[1,], aes(x, y), color = "green", pch = 21, size = 3, stroke = 1.25) +
-  geom_point(data = dat2[nrow(dat2),], aes(x, y), color = "red", pch = 24, size = 3,
-             stroke = 1.25) +
   theme_bw() +
   theme(axis.title = element_text(size = 16)) +
   guides(fill = guide_legend(label.theme = element_text(size = 12),
                              title.theme = element_text(size = 14))) +
-  coord_equal()
+  facet_wrap(track_length ~ id, scales = "free")
 
 
-
-
-
-
-## Calc MSE fro behav-specific prop over time (values for MM CRW sim)
-
-#create joint DF of true and modeled props
-theta.estim.long$type<- "Model"
-theta.estim.long2<- theta.estim.long %>% dplyr::select(names(true.behavior.long))
-theta.estim.long2$time1<- rep(1:5000, 3)
-theta.estim.long2<- theta.estim.long2[c(5001:10000,1:5000,10001:15000),]
-true.behavior.long$type<- "True"
-
-sq.err<- (theta.estim.long2$prop - true.behavior.long$prop)^2
-sq.err<- data.frame(sq.err = sq.err, behavior = true.behavior.long$behavior)
-
-#Mean Square Error for entire model and by behavior
-mean(sq.err$sq.err)  #0.0197
-
-sq.err %>% group_by(behavior) %>% summarise(mse = mean(sq.err))
-#Resting: 0.0205
-#ARS: 0.0324
-#Transit: 0.0061
 
 
 
 #export results
-# write.csv(dat2, "Modeled HC Sim Tracks w Behav.csv", row.names = F)  #for hard-clustering sim
-# write.csv(dat2, "Modeled MM Sim Tracks w Behav_multinom.csv", row.names = F)  #for mixed-membership sim
+# write.csv(dat2, "Modeled MM Sim Tracks w Behav.csv", row.names = F)  #for mixed-membership sim

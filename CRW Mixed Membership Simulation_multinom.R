@@ -1,131 +1,147 @@
 #####################################
 #####################################
-#### Mixed Membership Simulation ####
+#### Mixed-Membership Simulation ####
 #####################################
 #####################################
 
 library(tidyverse)
 library(circular)
+library(tictoc)
 
 source('Simulation Functions.R')
 
-### Simulate full track ###
+### Simulate full track w/ different numbers of time segments ###
+## Create tracks w/ 10, 50, 100, and 500 segments while keeping 100 obs per tseg
+## Generate 5 different versions of each of these tracks (all else being equal)
 
-#define behaviors and randomly sample 50 (for 50 time segments)
-#weight probs so that behavior 1 (Resting) occurs 50%, behavior 2 (Area-restricted search) occurs 35%, and behavior 3 (Transit) occurs 15%
+#define behaviors and sample them from Categorical distribution
+#weight probs so that behavior 1 (Resting) occurs 50%, behavior 2 (Area-restricted search) occurs 30%, and behavior 3 (Transit) occurs 20%
 
-set.seed(9) #5
-
-#create vector of dominant behaviors per time segment (50 segments)
-behav<- rmultinom(50, 1, c(0.5, 0.35, 0.15))
-ind<- vector()
-for (i in 1:50) {
-  tmp<- which(behav[,i] == 1)
-  ind[i]<- tmp
-}
-table(ind)/50 #check freq
-behav<- ind
-
-#randomly choose 3 segments of each behavior to be 'pure' instead of mixed
-behav1.pure<- sample(which(behav==1), 3, replace = FALSE)
-behav2.pure<- sample(which(behav==2), 3, replace = FALSE)
-behav3.pure<- sample(which(behav==3), 3, replace = FALSE)
-
-pure<- c(behav1.pure, behav2.pure, behav3.pure) %>% sort()
+set.seed(2)
 
 
-#create vector of behaviors within each time segment (duration of 100 steps)
-behav.full<- vector("list", length(behav))
-for (i in 1:length(behav)) {
-  if (i %in% pure) {
-    behav.full[[i]]<- rep(behav[i], 100)
-  }else if (behav[i] == 1) {
-    mat<- rmultinom(100, 1, c(0.8, 0.1, 0.1))
-    ind<- vector()
-    for (j in 1:100) {
-      tmp<- which(mat[,j] == 1)
-      ind[j]<- tmp
-    }
-    behav.full[[i]]<- ind
-  } else if (behav[i] == 2) {
-    mat<- rmultinom(100, 1, c(0.1, 0.8, 0.1))
-    ind<- vector()
-    for (j in 1:100) {
-      tmp<- which(mat[,j] == 1)
-      ind[j]<- tmp
-    }
-    behav.full[[i]]<- ind
-  } else if (behav[i] == 3) {
-    mat<- rmultinom(100, 1, c(0.1, 0.1, 0.8))
-    ind<- vector()
-    for (j in 1:100) {
-      tmp<- which(mat[,j] == 1)
-      ind[j]<- tmp
-    }
-    behav.full[[i]]<- ind
-  }
-}
-behav.full<- unlist(behav.full)
-
+#simulate track
+ntseg<- c(10, 50, 100, 500)
+nstep<- 100
 SL.params<- data.frame(shape=c(0.25, 2, 10), scale = c(1, 1, 1))
 TA.params<- data.frame(mu=c(pi, pi, 0), rho = c(0.8, 0, 0.8))
 
 
-#simulate track
-#n=duration of each observation (behav.full), behav is a vector of behaviors, SL.params and TA.params are DFs of the necessary params from which to generate distributions for SL and TA from gamma and wrapped cauchy distribs, and Z0 is the initial location
-
-track<- CRW.sim(n=1, behav = behav.full, SL.params = SL.params, TA.params = TA.params, Z0=c(0,0))
-names(track)[5]<- "behav_fine"
-track$behav_fine<- factor(track$behav)
-levels(track$behav_fine)<- c("Resting","ARS","Transit")
-track<- track %>% mutate(behav_coarse = c(NA, rep(behav, each=100)) %>% factor())
-levels(track$behav_coarse)<- c("Resting","ARS","Transit")
-
-true.brkpts<- which(diff(behav) != 0) * 100
+tic()
+track.sim<- CRW.sim(nsim=5, ntseg = ntseg, nstep = nstep, SL.params = SL.params,
+                        TA.params = TA.params, Z0=c(0,0))
+toc()
+#takes ~1.5 min to run
 
 
-# plot that puppy
-ggplot(data = track[-1,], aes(x,y)) +
+#extract tracks
+tracks<- track.sim$tracks %>%
+  modify_depth(2, ~modify_at(., "id", as.character)) %>%
+  modify_depth(1, ~map_dfr(., `[`)) %>%
+  map_dfr(`[`)
+
+#extract breakpoints
+max.length<- track.sim$brkpts %>%  #to set max number of columns for DF
+  modify_depth(2, ~length(.)) %>%
+  unlist() %>%
+  max()
+
+brkpts<- track.sim$brkpts %>%
+  modify_depth(2, function(x) {c(x, rep(NA, max.length-length(x)))}) %>%
+  modify_depth(1, ~map_dfr(., `[`)) %>%
+  map(t) %>%
+  map(as.data.frame) %>% 
+  map_dfr(., `[`)
+brkpts<- cbind(id = unique(tracks$id), brkpts)
+names(brkpts)<- c('id', paste0("Brk_",1:(ncol(brkpts)-1)))
+
+
+
+
+
+## Plot tracks ##
+
+ggplot(data = tracks %>%
+         group_by(id) %>%
+         slice(2:n()) %>%
+         ungroup(), aes(x,y)) +
   geom_path(color = "gray75") +
   geom_point(aes(fill=behav_coarse), pch = 21, size = 2.5, alpha = 0.7) +
-  geom_point(data = track[1,], aes(x, y), color = "green", pch = 21, size = 3, stroke = 1.25) +
-  geom_point(data = track[nrow(track),], aes(x, y), color = "red", pch = 24, size = 3,
-             stroke = 1.25) +
-  coord_equal() +
+  geom_point(data = tracks %>%
+               group_by(id) %>%
+               slice(which(row_number() == 1)) %>%
+               ungroup(), aes(x, y), color = "green", pch = 21, size = 3, stroke = 1.25) +
+  geom_point(data = tracks %>%
+               group_by(id) %>%
+               slice(which(row_number() == n())) %>%
+               ungroup(), aes(x, y), color = "red", pch = 24, size = 3, stroke = 1.25) +
+  # coord_equal() +
   scale_fill_viridis_d("Behavior") +
   theme_bw() +
   theme(axis.title = element_text(size = 16)) +
   guides(fill = guide_legend(label.theme = element_text(size = 12),
-                             title.theme = element_text(size = 14)))
+                             title.theme = element_text(size = 14))) +
+  facet_wrap(track_length ~ id, scales = "free")
 
 
-#compare distributions of SL and TA among fine-scale behaviors
-ggplot(track, aes(SL)) +
-  geom_density(aes(fill=behav_fine), alpha = 0.6, na.rm = T) +
-  scale_fill_viridis_d("Behavior") +
-  theme_bw()
-
-ggplot(track, aes(TA)) +
-  geom_density(aes(fill=behav_fine), alpha = 0.6, na.rm = T) +
-  scale_fill_viridis_d("Behavior") +
-  theme_bw()
 
 
-#compare distributions of SL and TA among coarse-scale behaviors
-ggplot(track, aes(SL)) +
-  geom_density(aes(fill=behav_coarse), alpha = 0.6, na.rm = T) +
-  scale_fill_viridis_d("Behavior") +
-  theme_bw()
+## Compare distributions of SL and TA among fine-scale behaviors ##
 
-ggplot(track, aes(TA)) +
-  geom_density(aes(fill=behav_coarse), alpha = 0.6, na.rm = T) +
-  scale_fill_viridis_d("Behavior") +
+# behav_fine
+ggplot(tracks[tracks$track_length == 1000,], aes(SL, color=behav_fine)) +
+  geom_line(stat = "density", alpha = 0.5, na.rm = T) +
+  geom_line(data =  tracks[tracks$track_length == 5000,], aes(SL, color=behav_fine),
+            stat = "density", alpha = 0.5, na.rm = T) +
+  geom_line(data = tracks[tracks$track_length == 10000,], aes(SL, color=behav_fine),
+            stat = "density", alpha = 0.5, na.rm = T) +
+  geom_line(data = tracks[tracks$track_length == 50000,], aes(SL, color=behav_fine),
+            stat = "density", alpha = 0.5, na.rm = T) +
+  scale_color_viridis_d("Behavior") +
   theme_bw()
 
 
+ggplot(tracks[tracks$track_length == 1000,], aes(TA, color=behav_fine)) +
+  geom_line(stat = "density", alpha = 0.5, na.rm = T) +
+  geom_line(data =  tracks[tracks$track_length == 5000,], aes(TA, color=behav_fine),
+            stat = "density", alpha = 0.5, na.rm = T) +
+  geom_line(data = tracks[tracks$track_length == 10000,], aes(TA, color=behav_fine),
+            stat = "density", alpha = 0.5, na.rm = T) +
+  geom_line(data = tracks[tracks$track_length == 50000,], aes(TA, color=behav_fine),
+            stat = "density", alpha = 0.5, na.rm = T) +
+  scale_color_viridis_d("Behavior") +
+  theme_bw()
+
+
+# behav_coarse
+ggplot(tracks[tracks$track_length == 1000,], aes(SL, color=behav_coarse)) +
+  geom_line(stat = "density", alpha = 0.5, na.rm = T) +
+  geom_line(data =  tracks[tracks$track_length == 5000,], aes(SL, color=behav_coarse),
+            stat = "density", alpha = 0.5, na.rm = T) +
+  geom_line(data = tracks[tracks$track_length == 10000,], aes(SL, color=behav_coarse),
+            stat = "density", alpha = 0.5, na.rm = T) +
+  geom_line(data = tracks[tracks$track_length == 50000,], aes(SL, color=behav_coarse),
+            stat = "density", alpha = 0.5, na.rm = T) +
+  scale_color_viridis_d("Behavior") +
+  theme_bw()
+
+
+ggplot(tracks[tracks$track_length == 1000,], aes(TA, color=behav_coarse)) +
+  geom_line(stat = "density", alpha = 0.5, na.rm = T) +
+  geom_line(data =  tracks[tracks$track_length == 5000,], aes(TA, color=behav_coarse),
+            stat = "density", alpha = 0.5, na.rm = T) +
+  geom_line(data = tracks[tracks$track_length == 10000,], aes(TA, color=behav_coarse),
+            stat = "density", alpha = 0.5, na.rm = T) +
+  geom_line(data = tracks[tracks$track_length == 50000,], aes(TA, color=behav_coarse),
+            stat = "density", alpha = 0.5, na.rm = T) +
+  scale_color_viridis_d("Behavior") +
+  theme_bw()
 
 
 
-write.csv(track, "CRW_MM_sim_multinom.csv", row.names = F)
 
+
+
+write.csv(tracks, "CRW_MM_sim_multinom.csv", row.names = F)
+write.csv(brkpts, "CRW_MM_sim_brkpts.csv", row.names = F)
 

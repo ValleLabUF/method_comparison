@@ -45,7 +45,7 @@ set.seed(2)
 
 hmm.res<- list()
 
-for (j in seq_along(move.d)) {
+for (j in 1:length(move.d)) {
   
   start.time<- Sys.time()
   
@@ -181,6 +181,26 @@ for (j in seq_along(move.d)) {
 
 names(hmm.res)<- names(move.d)
 
+#Compare elapsed times
+time<- map(hmm.res, . %>% pluck("elapsed.time")) %>% 
+  map_dfr(., `[`) %>% 
+  t() %>% 
+  data.frame(stringsAsFactors=FALSE) %>% 
+  rename(time = '.') %>% 
+  mutate(., time_num = parse_number(time), time_unit = word(time, 2)) %>% 
+  transmute(time = case_when(time_unit == "secs" ~ time_num/60,
+                             time_unit == "mins" ~ time_num))
+
+time$track_length<- rep(c('1k','5k','10k','50k'), each = 5) %>% 
+  factor(., levels = c('1k','5k','10k','50k'))
+
+
+ggplot(time, aes(track_length, time)) +
+  geom_boxplot() +
+  labs(x="Track Length", y = "Elapsed Time (min)") +
+  theme_bw()
+
+
 
 
 ## View output from each model and inspect pseudo-residuals
@@ -191,11 +211,13 @@ for (i in 1:length(hmm.res)) {
   plot(hmm.res[[i]]$models[[3]])
 }
 
+par(ask=T)
 for (i in 1:length(hmm.res)) {
   plotPR(hmm.res[[i]]$models[[1]])
   plotPR(hmm.res[[i]]$models[[2]])
   plotPR(hmm.res[[i]]$models[[3]])
 }
+par(ask=F)
 
 
 ## Make inference via AIC
@@ -208,6 +230,12 @@ for (i in 1:length(hmm.res)) {
   print(AIC(k.2, k.3, k.4))
   print(AICweights(k.2, k.3, k.4))  #4 states is far and away the best model
 }
+
+# Identify K per AIC
+k.optim_AIC<- c(3, 4, 2, 3, 3,
+                3, 3, 4, 3, 2,
+                2, 4, 4, 3, 4,
+                3, 4, 3, 3, 3)
 
 ## Make inference via BIC
 # BIC = -2*logL + p*log(T)
@@ -227,18 +255,155 @@ for (i in 1:length(hmm.res)) {
   print(2*k.4$mod$minimum) + (length(k.4$mod$estimate)*log(nrow(d.list[[i]])))  
 }
 
-# Identify K per AIC, BIC, and plots of density distributions
-k.optim<- c(3, 4, 3, 3, 4,
-            2, 2, 2, 2, 2,
-            2, 2, 2, 2, 2,
-            2, 2, 2, 2, 2)
+# Identify K per BIC
+k.optim_BIC<- c(3, 4, 2, 3, 4,
+                3, 3, 4, 3, 2,
+                2, 4, 4, 3, 4,
+                3, 4, 3, 3, 3)
 
 
-### Sticking w/ K=3
+# Identify K per AIC, BIC, and density distributions
+k.optim<- c(3, 4, 2, 3, 3,
+            3, 3, 4, 3, 2,
+            2, 4, 4, 3, 4,
+            3, 4, 3, 3, 3)
+
+table(k.optim)/20
+# 55% (n=11) of simulations were estimated to exhibit 3 behaviors
+# 15% (n=3) were estimated to exhibit 2 behaviors
+# 30% (n=6) were estimated to exhibit 4 behaviors
+
+
+### Sticking w/ K=3 for direct comparison
 
 hmm.states<- hmm.res %>% 
   map(., ~pluck(., 1, 2)) %>% 
   map(viterbi) %>% 
-  map2(d.list, ., ~cbind(.x, hmm.state = c(NA, .y[-length(.y)])))
+  map2(d.list, ., ~cbind(.x, hmm.state = c(NA, .y[-length(.y)]))) %>% 
+  bind_rows()
 
-write.csv(hmm.states,"HMM results.csv")
+
+
+
+########################
+### Model Validation ###
+########################
+
+### Coarse-scale
+
+# Overall
+hmm.states %>% 
+  group_by(track_length, ID) %>% 
+  filter(., behav_coarse == hmm.state) %>% 
+  tally() %>% 
+  mutate(acc = n/track_length) %>% 
+  summarise(min=min(acc), max=max(acc), mean=mean(acc))
+# accuracy ranges from 6.8% to 89.6%
+
+# For 'Resting' behavior
+rest.size<- hmm.states %>% 
+  group_by(track_length, ID) %>% 
+  filter(., behav_coarse == 1) %>% 
+  tally()
+
+hmm.states %>% 
+  group_by(track_length, ID) %>% 
+  filter(., behav_coarse == 1 & hmm.state == 1) %>% 
+  tally() %>% 
+  left_join(., rest.size, by = "ID") %>% 
+  mutate(acc = n.x/n.y) %>% 
+  summarise(min=min(acc), max=max(acc), mean=mean(acc))
+# accuracy ranges from 4.3% to 100.0%
+
+# For 'ARS' behavior
+ars.size<- hmm.states %>% 
+  group_by(track_length, ID) %>% 
+  filter(., behav_coarse == 2) %>% 
+  tally()
+
+hmm.states %>% 
+  group_by(track_length, ID) %>% 
+  filter(., behav_coarse == 2 & hmm.state == 2) %>% 
+  tally() %>% 
+  left_join(., ars.size, by = "ID") %>% 
+  mutate(acc = n.x/n.y) %>% 
+  summarise(min=min(acc), max=max(acc), mean=mean(acc))
+# accuracy ranges from 8.4% to 100.0%
+
+# For 'Transit' behavior
+transit.size<- hmm.states %>% 
+  group_by(track_length, ID) %>% 
+  filter(., behav_coarse == 3) %>% 
+  tally()
+
+hmm.states %>% 
+  group_by(track_length, ID) %>% 
+  filter(., behav_coarse == 3 & hmm.state == 3) %>% 
+  tally() %>% 
+  left_join(., transit.size, by = "ID") %>% 
+  mutate(acc = n.x/n.y) %>% 
+  summarise(min=min(acc), max=max(acc), mean=mean(acc))
+# accuracy ranges from 5.3% to 100.0%
+
+
+
+### Fine-scale
+
+# Overall
+hmm.states %>% 
+  group_by(track_length, ID) %>% 
+  filter(., behav_fine == hmm.state) %>% 
+  tally() %>% 
+  mutate(acc = n/track_length) %>% 
+  summarise(min=min(acc), max=max(acc), mean=mean(acc))
+# accuracy ranges from 4.8% to 92.6%
+
+# For 'Resting' behavior
+rest.size<- hmm.states %>% 
+  group_by(track_length, ID) %>% 
+  filter(., behav_fine == 1) %>% 
+  tally()
+
+hmm.states %>% 
+  group_by(track_length, ID) %>% 
+  filter(., behav_fine == 1 & hmm.state == 1) %>% 
+  tally() %>% 
+  left_join(., rest.size, by = "ID") %>% 
+  mutate(acc = n.x/n.y) %>% 
+  summarise(min=min(acc), max=max(acc), mean=mean(acc))
+# accuracy ranges from 0.04% to 100.0%
+
+# For 'ARS' behavior
+ars.size<- hmm.states %>% 
+  group_by(track_length, ID) %>% 
+  filter(., behav_fine == 2) %>% 
+  tally()
+
+hmm.states %>% 
+  group_by(track_length, ID) %>% 
+  filter(., behav_fine == 2 & hmm.state == 2) %>% 
+  tally() %>% 
+  left_join(., ars.size, by = "ID") %>% 
+  mutate(acc = n.x/n.y) %>% 
+  summarise(min=min(acc), max=max(acc), mean=mean(acc))
+# accuracy ranges from 1.7% to 100.0%
+
+# For 'Transit' behavior
+transit.size<- hmm.states %>% 
+  group_by(track_length, ID) %>% 
+  filter(., behav_fine == 3) %>% 
+  tally()
+
+hmm.states %>% 
+  group_by(track_length, ID) %>% 
+  filter(., behav_fine == 3 & hmm.state == 3) %>% 
+  tally() %>% 
+  left_join(., transit.size, by = "ID") %>% 
+  mutate(acc = n.x/n.y) %>% 
+  summarise(min=min(acc), max=max(acc), mean=mean(acc))
+# accuracy ranges from 0.23% to 100.0%
+
+
+# Export data and results
+# write.csv(hmm.states, "HMM results.csv", row.names = F)
+# write.csv(time, "HMM_elapsed_time.csv", row.names = F)  #units = min

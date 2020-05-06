@@ -43,12 +43,17 @@ gamma1=0.1
 alpha=0.1
 
 #run Gibbs sampler
-obs.list<- df.to.list(obs, "id")
+obs.list<- df.to.list(obs, ind = "id")
 res<- list()
+elapsed.time<- vector()
+
 for (i in 1:length(obs.list)) {
+  start.time<- Sys.time()
   res[[i]]=LDA_behavior_gibbs(dat=obs.list[[i]], gamma1=gamma1, alpha=alpha,
                               ngibbs=ngibbs, nmaxclust=nmaxclust,
                               nburn=nburn, ndata.types=ndata.types)
+  end.time<- Sys.time()
+  elapsed.time[i]<- difftime(end.time, start.time, units = "min")
 }
 
 #Check traceplot of log likelihood
@@ -80,7 +85,7 @@ map(theta.estim, function(x) round(colSums(x)/nrow(x), digits = 3))
 
 ## Viz histograms from model
 behav.res<- map(res, get_behav_hist, dat_red = dat_red) %>% 
-    map(., function(x) x[x$behav <= 3,])  #only select the top 3 behaviors
+    map(., function(x) x[x$behav <= 5,])  #only select the top 3 behaviors
 
 
 #Plot histograms of proportion data; order color scale from slow to fast
@@ -94,8 +99,8 @@ for (i in 1:length(behav.res)) {
     theme(axis.title = element_text(size = 16), axis.text.y = element_text(size = 14),
           axis.text.x.bottom = element_text(size = 12),
           strip.text = element_text(size = 14), strip.text.x = element_text(face = "bold")) +
-    scale_fill_manual(values = viridis(n=3), guide = F) +
-    facet_grid(param ~ behav, scales = "fixed")
+    scale_fill_viridis_d(guide = F) +
+    facet_grid(behav ~ param, scales = "fixed")
   )
 }
 par(ask=F)
@@ -114,7 +119,6 @@ theta.estim<- map(theta.estim, . %>%
       rename('1' = V1, '2' = V2, '3' = V3) %>%  #rename cols as numbers
       dplyr::select(tseg, 1, 2, 3))  #reorder cols
 names(theta.estim)<- names(obs.list)
-# theta.estim<- data.frame(id = obs$id, tseg = obs$tseg, theta.estim)
 
 
 #calc obs per tseg using SL bins (more reliable than TA)
@@ -137,10 +141,14 @@ for (i in 1:length(dat.list)) {
 
 
 #Need to manually inspect all histograms and assign proper order (slowest to fastest)
-behav.order<- list(c(3,1,2), c(2,1,3), c(3,2,1), c(2,1,3), c(3,2,1),
-                   c(2,3,1), c(1,3,2), c(2,1,3), c(2,3,1), c(2,3,1),
-                   c(2,3,1), c(2,1,3), c(2,1,3), c(1,2,3), c(1,3,2),
-                   c(3,1,2), c(2,1,3), c(2,3,1), c(3,2,1), c(3,1,2))
+# behav.order<- list(c(3,1,2), c(2,1,3), c(3,2,1), c(2,1,3), c(3,2,1),
+#                    c(2,3,1), c(1,3,2), c(2,1,3), c(2,3,1), c(2,3,1),
+#                    c(2,3,1), c(2,1,3), c(2,1,3), c(1,2,3), c(1,3,2),
+#                    c(3,1,2), c(2,1,3), c(2,3,1), c(3,2,1), c(3,1,2))
+behav.order<- list(c(1,3,2), c(1,2,3), c(2,3,1), c(1,3,2), c(2,3,1),
+                   c(1,3,2), c(2,3,1), c(2,3,1), c(2,3,1), c(1,2,3),
+                   c(2,1,3), c(1,2,3), c(2,1,3), c(2,3,1), c(1,3,2),
+                   c(1,3,2), c(1,2,3), c(2,3,1), c(2,3,1), c(2,3,1))
 names(behav.order)<- names(theta.estim)
 
 
@@ -249,7 +257,24 @@ ggplot(data = dat2 %>%
 
 
 
+## Viz elapsed time
+
+time<- elapsed.time %>% 
+  unlist() %>% 
+  data.frame(time = .)
+
+time$track_length<- rep(c('1k','5k','10k','50k'), each = 5) %>% 
+  factor(., levels = c('1k','5k','10k','50k'))
+
+
+ggplot(time, aes(track_length, time)) +
+  geom_boxplot() +
+  labs(x="Track Length", y = "Elapsed Time (min)") +
+  theme_bw()
+
+
 
 
 #export results
 # write.csv(dat2, "Modeled MM Sim Tracks w Behav.csv", row.names = F)  #for mixed-membership sim
+# write.csv(time, "LDA_elapsed_time.csv", row.names = F)  #units = min

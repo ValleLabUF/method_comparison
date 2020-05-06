@@ -115,16 +115,16 @@ alpha = 1
 ngibbs = 40000
 
 plan(multisession)
-# track_length == 1000; takes 3 min for 40000 iterations
+# track_length == 1000; takes 3.5 min for 40000 iterations
 dat.res_1k<- behavior_segment(data = behav.list2[1:5], ngibbs = ngibbs, nbins = c(5,8),
                            alpha = alpha)
-# track_length == 5000; takes 13 min for 40000 iterations
+# track_length == 5000; takes 14 min for 40000 iterations
 dat.res_5k<- behavior_segment(data = behav.list2[6:10], ngibbs = ngibbs, nbins = c(5,8),
                            alpha = alpha)
-# track_length == 10000; takes 23 min for 40000 iterations
+# track_length == 10000; takes 25 min for 40000 iterations
 dat.res_10k<- behavior_segment(data = behav.list2[11:15], ngibbs = ngibbs, nbins = c(5,8),
                            alpha = alpha)
-# track_length == 50000; takes 139 min for 40000 iterations
+# track_length == 50000; takes 138 min for 40000 iterations
 dat.res_50k<- behavior_segment(data = behav.list2[16:20], ngibbs = ngibbs, nbins = c(5,8),
                            alpha = alpha)
 plan(sequential)  #closes background workers
@@ -226,10 +226,15 @@ ggplot(time, aes(track_length, time)) +
 
 
 
+#assign time seg and make as DF
+dat_out<- map(behav.list, assign.time.seg, brkpts = brkpts) %>% map_dfr(`[`)
 
-dat_out<- map(behav.list, assign.time.seg, brkpts = brkpts) %>% map_dfr(`[`)  #assign time seg and make as DF
+#export breakpoints for easier reference and elapsed time for method comparison
+names(all.brkpts)<- names(dat.list)
+all.brkpts<- bind_rows(all.brkpts, .id = 'id')
 
 
 #export results for hard-clustering and mixed-membership simulations
 # write.csv(dat_out, "CRW_MM_tsegs.csv", row.names = F)
-# write.csv(all.brkpts, "CRW_MM_allbreakpts.csv", row.names = F)
+# write.csv(all.brkpts, "Bayesian_allbreakpts.csv", row.names = F)
+# write.csv(time, "Bayesian_elapsed_time.csv", row.names = F)  #units = min

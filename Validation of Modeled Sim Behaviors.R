@@ -17,7 +17,7 @@ dat %>%
   tally() %>% 
   mutate(acc = n/track_length) %>% 
   summarise(min=min(acc), max=max(acc), mean=mean(acc))
-# accuracy ranges from 95.0% to 99.7%
+# accuracy ranges from 76.9% to 99.7%
 
 
 ## For 'Resting' behavior
@@ -35,7 +35,7 @@ dat %>%
   left_join(., rest.size, by = "id") %>% 
   mutate(acc = n.x/n.y) %>% 
   summarise(min=min(acc), max=max(acc), mean=mean(acc))
-# accuracy ranges from 93.5% to 99.8%
+# accuracy ranges from 86.5% to 100.0%
 
 ## For 'ARS' behavior
 ars.size<- dat %>% 
@@ -52,7 +52,7 @@ dat %>%
   left_join(., ars.size, by = "id") %>% 
   mutate(acc = n.x/n.y) %>% 
   summarise(min=min(acc), max=max(acc), mean=mean(acc))
-# accuracy ranges from 95.4% to 100.0%
+# accuracy ranges from 24.7% to 100.0%
 
 ## For 'Transit' behavior
 transit.size<- dat %>% 
@@ -85,7 +85,7 @@ dat %>%
   tally() %>% 
   mutate(acc = n/track_length) %>% 
   summarise(min=min(acc), max=max(acc), mean=mean(acc))
-# accuracy ranges from 78.1% to 84.6%
+# accuracy ranges from 64.7% to 84.6%
 
 
 ## For 'Resting' behavior
@@ -103,7 +103,7 @@ dat %>%
   left_join(., rest.size2, by = "id") %>% 
   mutate(acc = n.x/n.y) %>% 
   summarise(min=min(acc), max=max(acc), mean=mean(acc))
-# accuracy ranges from 81.9% to 96.0%
+# accuracy ranges from 78.4% to 97.3%
 
 ## For 'ARS' behavior
 ars.size2<- dat %>% 
@@ -120,7 +120,7 @@ dat %>%
   left_join(., ars.size2, by = "id") %>% 
   mutate(acc = n.x/n.y) %>% 
   summarise(min=min(acc), max=max(acc), mean=mean(acc))
-# accuracy ranges from 62.6% to 85.8%
+# accuracy ranges from 19.8% to 85.7%
 
 ## For 'Transit' behavior
 transit.size2<- dat %>% 

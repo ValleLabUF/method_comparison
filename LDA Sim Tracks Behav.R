@@ -71,6 +71,10 @@ theta.estim<- theta.post %>%
   map(., colMeans) %>% 
   map(., ~matrix(., ncol = nmaxclust)) #calc mean of posterior
 
+#export theta.estim if need to re-analyze later
+# theta.estim_export<- theta.estim %>% map(., as.data.frame) %>% bind_rows(., .id = 'id')
+# write.csv(theta.estim_export, "theta_estim.csv", row.names = F)
+
 #boxplots
 par(mfrow=c(2,2), ask = T)
 for (i in 1:length(res)) {
@@ -81,11 +85,16 @@ par(mfrow=c(1,1), ask=F)
 
 #Determine proportion of behaviors (across all time segments)
 #Possibly set threshold below which behaviors are excluded
-map(theta.estim, function(x) round(colSums(x)/nrow(x), digits = 3))
+purrr::map(theta.estim, function(x) round(colSums(x)/nrow(x), digits = 3)) %>% 
+  purrr::map(., ~sum(.[1:3])) #%>% 
+  # unlist() %>% 
+  # data.frame() %>% 
+  # summarise(mean=mean(.), sd=sd(.))
+## First 3 behaviors have mean of 97.5% and SD=0.04
 
 ## Viz histograms from model
-behav.res<- map(res, get_behav_hist, dat_red = dat_red) %>% 
-    map(., function(x) x[x$behav <= 5,])  #only select the top 3 behaviors
+behav.res<- purrr::map(res, get_behav_hist, dat_red = dat_red) %>% 
+  purrr::map(., function(x) x[x$behav <= 3,])  #only select the top 3 behaviors
 
 
 #Plot histograms of proportion data; order color scale from slow to fast

@@ -153,8 +153,8 @@ ML<- getML(dat.res$LML, nburn = 20000)
 brkpts<- getBreakpts(dat = dat.res$brkpts, ML = ML)
 
 ## Heatmaps
-plot.heatmap(data = behav.list, nbins = c(5,8), brkpts = brkpts, dat.res = dat.res,
-             type = "behav", title = T, legend = T)
+plot.heatmap(data = behav.list[4], nbins = c(5,8), brkpts = brkpts, type = "behav", title = T,
+             legend = T)
 
 
 

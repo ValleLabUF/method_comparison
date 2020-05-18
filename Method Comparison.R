@@ -5,6 +5,7 @@
 library(tidyverse)
 library(wesanderson)
 library(lubridate)
+library(cowplot)
 
 
 # Load elapsed time
@@ -38,11 +39,22 @@ time$track_length<- time$track_length %>%
   factor(., levels = c('1k','5k','10k','50k'))
 
 
-ggplot(time, aes(track_length, time, fill = method)) +
+p.time<- ggplot(time, aes(track_length, time, fill = method, color = method)) +
   geom_boxplot() +
-  labs(x="Track Length", y = "Elapsed Time (min)") +
-  scale_fill_manual(values = wes_palette("Zissou1")[c(1,3,5)]) +
-  theme_bw()
+  stat_summary(geom = "crossbar", width = 0.6, fatten=1.5, color="black",
+               position = position_dodge(0.75),
+               fun.data = function(x){c(y=median(x), ymin=median(x), ymax=median(x))}) +
+  labs(x="\nTrack Length (observations)", y = "Elapsed Time (min)\n") +
+  scale_x_discrete(labels = c(1000,5000,10000,50000)) +
+  scale_fill_manual("", values = wes_palette("Zissou1")[c(1,3,5)]) +
+  scale_color_manual("", values = wes_palette("Zissou1")[c(1,3,5)]) +
+  theme_bw() +
+  theme(axis.title = element_text(size = 16),
+        axis.text = element_text(size = 14),
+        panel.grid = element_blank(),
+        legend.position = c(0.15,0.85),
+        legend.background = element_blank(),
+        legend.text = element_text(size = 12))
 
 
 ###########################
@@ -74,26 +86,33 @@ brkpt.acc<- all.brkpts %>%
   filter(type == "Model") %>% 
   tally() %>% 
   mutate(freq = n/sum(n)) %>% 
-  mutate(track_length = case_when(str_detect(id, "_1") ~ "1k",
-                                  str_detect(id, "_2") ~ "5k",
-                                  str_detect(id, "_3") ~ "10k",
-                                  str_detect(id, "_4") ~ "50k")) %>% 
+  mutate(track_length = case_when(str_detect(id, "_1") ~ "1000",
+                                  str_detect(id, "_2") ~ "5000",
+                                  str_detect(id, "_3") ~ "10000",
+                                  str_detect(id, "_4") ~ "50000")) %>% 
   # summarise(mean = mean(freq), sd = sd(freq), n = sum(n)) %>%
   group_by(method, track_length, id) %>% 
   filter(acc == "Accurate" | acc == "Accurate Duplicate") %>% 
   summarise(freq = sum(freq)) %>%  #and calculate accuracy across all sims combined
   ungroup()
 
-brkpt.acc$track_length<- brkpt.acc2$track_length %>% 
-  factor(., levels = c('1k','5k','10k','50k'))
+brkpt.acc$track_length<- brkpt.acc$track_length %>% 
+  factor(., levels = c('1000','5000','10000','50000'))
 
 
 #Accuracy (includes 'accurate' and 'accurate duplicate' classifications)
-ggplot(brkpt.acc, aes(track_length, freq, fill = method)) +
+p.brk<- ggplot(brkpt.acc, aes(track_length, freq, fill = method, color = method)) +
   geom_boxplot() +
-  labs(x="Track Length", y = "Proportion of Accurate Breakpoints") +
-  scale_fill_manual(values = wes_palette("Zissou1")[c(1,3,5)]) +
-  theme_bw()
+  stat_summary(geom = "crossbar", width = 0.6, fatten=1.5, color="black",
+               position = position_dodge(0.75),
+               fun.data = function(x){c(y=median(x), ymin=median(x), ymax=median(x))}) +
+  labs(x="\nTrack Length (observations)", y = "Proportion of Accurate Breakpoints\n") +
+  scale_fill_manual("", values = wes_palette("Zissou1")[c(1,3)], guide = F) +
+  scale_color_manual("", values = wes_palette("Zissou1")[c(1,3)], guide = F) +
+  theme_bw() +
+  theme(axis.title = element_text(size = 16),
+        axis.text = element_text(size = 14),
+        panel.grid = element_blank())
 
 
 #calc mean accuracy per track_length and method
@@ -156,13 +175,24 @@ summ.stats_coarse<- res %>%
 
 summ.stats_coarse$track_length<- summ.stats$track_length %>% 
   factor(., levels = c('1000','5000','10000','50000'))
+summ.stats_coarse<- summ.stats_coarse %>% 
+  filter(method == "Bayesian" | method == "HMM")  #don't compare BCPA behavior
 
-
-ggplot(summ.stats_coarse, aes(track_length, acc, fill = method)) +
+p.coarse<- ggplot(summ.stats_coarse, aes(track_length, acc, fill = method, color = method)) +
   geom_boxplot() +
-  labs(x="Track Length", y = "Accuracy of Behavior Estimates") +
-  scale_fill_manual(values = wes_palette("Zissou1")[c(1,3,5)]) +
-  theme_bw()
+  stat_summary(geom = "crossbar", width = 0.6, fatten=1.5, color="black",
+               position = position_dodge(0.75),
+               fun.data = function(x){c(y=median(x), ymin=median(x), ymax=median(x))}) +
+  ylim(0,1) +
+  labs(x="\nTrack Length (observations)", y = "Accuracy of Behavior Estimates\n") +
+  scale_fill_manual("", values = wes_palette("Zissou1")[c(1,5)]) +
+  scale_color_manual("", values = wes_palette("Zissou1")[c(1,5)]) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        axis.title = element_text(size = 16),
+        axis.text = element_text(size = 14),
+        legend.position = "n",
+        legend.text = element_text(size = 10))
 
 
 
@@ -186,11 +216,32 @@ summ.stats_fine<- res %>%
 
 summ.stats_fine$track_length<- summ.stats$track_length %>% 
   factor(., levels = c('1000','5000','10000','50000'))
+summ.stats_fine<- summ.stats_fine %>% 
+  filter(method == "Bayesian" | method == "HMM")  #don't compare BCPA behavior
 
 
-ggplot(summ.stats_fine, aes(track_length, acc, fill = method)) +
+p.fine<- ggplot(summ.stats_fine, aes(track_length, acc, fill = method, color = method)) +
   geom_boxplot() +
-  labs(x="Track Length", y = "Accuracy of Behavior Estimates") +
-  scale_fill_manual(values = wes_palette("Zissou1")[c(1,3,5)]) +
+  stat_summary(geom = "crossbar", width = 0.6, fatten=1.5, color="black",
+               position = position_dodge(0.75),
+               fun.data = function(x){c(y=median(x), ymin=median(x), ymax=median(x))}) +
   ylim(0,1) +
-  theme_bw()
+  labs(x="\nTrack Length (observations)", y = "Accuracy of Behavior Estimates\n") +
+  scale_fill_manual("", values = wes_palette("Zissou1")[c(1,5)]) +
+  scale_color_manual("", values = wes_palette("Zissou1")[c(1,5)]) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        axis.title = element_text(size = 16),
+        axis.text = element_text(size = 14),
+        legend.position = "n",
+        legend.text = element_text(size = 10))
+
+
+
+plot_grid(NULL, NULL, NULL,
+          p.time, NULL, p.brk,
+          NULL, NULL, NULL,
+          p.coarse, NULL, p.fine,
+          align = "hv", nrow = 4, rel_widths = c(1,0.1,1), rel_heights = c(0.2,1,0.1,1))
+
+# ggsave("Figure 3 (method comparison).png", width = 12, height = 8, units = "in", dpi = 330)

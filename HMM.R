@@ -39,147 +39,31 @@ par(mfrow=c(1,1), ask=F)
 
 
 ### Test with 2-4 behavioral states and then perform order selection via AIC/BIC
+source('Iterate HMMs.R')
 
-set.seed(2)
+set.seed(3)
+hmm.res_1k<- run.HMMs(move.d, 1:5)
+names(hmm.res_1k)<- names(move.d)[1:5]
+
+set.seed(3)
+hmm.res_5k<- run.HMMs(move.d, 6:10)
+hmm.res_5k<- hmm.res_5k[6:10]
+names(hmm.res_5k)<- names(move.d)[6:10]
+
+set.seed(1)
+hmm.res_10k<- run.HMMs(move.d, 11:15)
+hmm.res_10k<- hmm.res_10k[11:15]
+names(hmm.res_10k)<- names(move.d)[11:15]
+
+set.seed(1)
+hmm.res_50k<- run.HMMs(move.d, 16:20)
+hmm.res_50k<- hmm.res_50k[16:20]
+names(hmm.res_50k)<- names(move.d)[16:20]
 
 
-hmm.res<- list()
+## Combine all model results
+hmm.res<- c(hmm.res_1k, hmm.res_5k, hmm.res_10k, hmm.res_50k)
 
-for (j in 1:length(move.d)) {
-  
-  start.time<- Sys.time()
-  
-  # Empty list for order selection
-  k.models<- list()
-  
-  
-  ## K = 2
-  print(paste("Simulation", j))
-  
-  stateNames <- c("Encamped","Exploratory")
-  whichzero <- which(move.d[[j]]$step == 0)
-  propzero <- length(whichzero)/nrow(move.d[[j]])
-  zeromass0 <- c(propzero, 0.05)        #for zero distances by state
-  
-  # Step length mean
-  stepMean0 <- runif(2,
-                     min = c(0.1, 5),
-                     max = c(2, 20))
-  # Step length standard deviation
-  stepSD0 <- runif(2,
-                   min = c(0.1, 2),
-                   max = c(1, 8))
-  # Turning angle mean
-  angleMean0 <- c(pi, 0)
-  # Turning angle concentration
-  angleCon0 <- runif(2,
-                     min = c(0.4, 0.5),
-                     max = c(0.99, 0.99))
-  # Fit model
-  if(propzero > 0) {  #don't include zero mass if no 0s present
-    stepPar0 <- c(stepMean0, stepSD0, zeromass0)
-  } else {
-    stepPar0 <- c(stepMean0, stepSD0)
-  }
-  anglePar0 <- c(angleMean0,angleCon0)
-  k.models[[1]] <- fitHMM(data = move.d[[j]], nbStates = 2, 
-                          Par0 = list(step = stepPar0, angle = anglePar0),
-                          dist = list(step = "gamma", angle = "wrpcauchy"),
-                          formula = ~ 1, stationary=TRUE, #stationary for a slightly better fit
-                          estAngleMean = list(angle=TRUE),
-                          stateNames = stateNames,
-                          retryFits = 30)
-  
-  
-  
-  
-  ## K = 3
-  print(paste("Simulation", j))
-  
-  stateNames <- c("Resting","ARS","Transit")
-  whichzero <- which(move.d[[j]]$step == 0)
-  propzero <- length(whichzero)/nrow(move.d[[j]])
-  zeromass0 <- c(propzero, 0.01, 0.05)        #for zero distances by state
-  
-  # Step length mean
-  stepMean0 <- runif(3,
-                     min = c(0.1, 0.5, 5),
-                     max = c(2, 5, 20))
-  # Step length standard deviation
-  stepSD0 <- runif(3,
-                   min = c(0.1, 1, 2),
-                   max = c(1, 2, 8))
-  # Turning angle mean
-  angleMean0 <- c(pi, 0, 0)
-  # Turning angle concentration
-  angleCon0 <- runif(3,
-                     min = c(0.4, 0.01, 0.5),
-                     max = c(0.99, 0.3, 0.99))
-  # Fit model
-  if(propzero > 0) {  #don't include zero mass if no 0s present
-    stepPar0 <- c(stepMean0, stepSD0, zeromass0)
-  } else {
-    stepPar0 <- c(stepMean0, stepSD0)
-  }
-  anglePar0 <- c(angleMean0,angleCon0)
-  k.models[[2]] <- fitHMM(data = move.d[[j]], nbStates = 3, 
-                          Par0 = list(step = stepPar0, angle = anglePar0),
-                          dist = list(step = "gamma", angle = "wrpcauchy"),
-                          formula = ~ 1, stationary=TRUE, #stationary for a slightly better fit
-                          estAngleMean = list(angle=TRUE),
-                          stateNames = stateNames,
-                          retryFits = 30)
-  
-  
-  
-  
-  
-  ## K = 4
-  print(paste("Simulation", j))
-  
-  stateNames <- c("Resting","ARS","Exploratory","Transit")
-  whichzero <- which(move.d[[j]]$step == 0)
-  propzero <- length(whichzero)/nrow(move.d[[j]])
-  zeromass0 <- c(propzero, 0.01, 0.03, 0.05)        #for zero distances by state
-  
-  # Step length mean
-  stepMean0 <- runif(4,
-                     min = c(0.1, 0.5, 3, 8),
-                     max = c(2, 5, 10, 20))
-  # Step length standard deviation
-  stepSD0 <- runif(4,
-                   min = c(0.1, 1, 2, 4),
-                   max = c(1, 2, 4, 8))
-  # Turning angle mean
-  angleMean0 <- c(pi, pi, 0, 0)
-  # Turning angle concentration
-  angleCon0 <- runif(4,
-                     min = c(0.4, 0.01, 0.01, 0.5),
-                     max = c(0.99, 0.5, 0.5, 0.99))
-  # Fit model
-  if(propzero > 0) {  #don't include zero mass if no 0s present
-    stepPar0 <- c(stepMean0, stepSD0, zeromass0)
-  } else {
-    stepPar0 <- c(stepMean0, stepSD0)
-  }
-  anglePar0 <- c(angleMean0,angleCon0)
-  k.models[[3]] <- fitHMM(data = move.d[[j]], nbStates = 4, 
-                          Par0 = list(step = stepPar0, angle = anglePar0),
-                          dist = list(step = "gamma", angle = "wrpcauchy"),
-                          formula = ~ 1, stationary=TRUE, #stationary for a slightly better fit
-                          estAngleMean = list(angle=TRUE),
-                          stateNames = stateNames,
-                          retryFits = 30)
-  
-  
-  
-  end.time<- Sys.time()
-  elapsed.time<- difftime(end.time, start.time, units = "min")
-  
-  hmm.res[[j]]<- list(models = k.models, elapsed.time = elapsed.time)
-}
-
-names(hmm.res)<- names(move.d)
 
 #Compare elapsed times
 time<- map(hmm.res, . %>% pluck("elapsed.time")) %>% 
@@ -232,10 +116,10 @@ for (i in 1:length(hmm.res)) {
 }
 
 # Identify K per AIC
-k.optim_AIC<- c(3, 4, 2, 3, 3,
-                3, 3, 4, 3, 2,
-                2, 4, 4, 3, 4,
-                3, 4, 3, 3, 3)
+k.optim_AIC<- c(3, 3, 3, 3, 3,
+                3, 3, 3, 3, 3,
+                3, 3, 4, 4, 4,
+                3, 3, 3, 4, 3)
 
 ## Make inference via BIC
 # BIC = -2*logL + p*log(T)
@@ -256,22 +140,21 @@ for (i in 1:length(hmm.res)) {
 }
 
 # Identify K per BIC
-k.optim_BIC<- c(3, 4, 2, 3, 4,
-                3, 3, 4, 3, 2,
-                2, 4, 4, 3, 4,
-                3, 4, 3, 3, 3)
-
+k.optim_BIC<- c(3, 3, 3, 3, 3,
+                3, 3, 3, 3, 3,
+                3, 4, 4, 4, 4,
+                3, 3, 3, 4, 3)
 
 # Identify K per AIC, BIC, and density distributions
-k.optim<- c(3, 4, 2, 3, 3,
-            3, 3, 4, 3, 2,
-            2, 4, 4, 3, 4,
-            3, 4, 3, 3, 3)
+k.optim<- c(3, 3, 3, 3, 3,
+            3, 3, 3, 3, 3,
+            3, 3, 3, 3, 3,
+            3, 3, 3, 3, 3)
 
 table(k.optim)/20
-# 55% (n=11) of simulations were estimated to exhibit 3 behaviors
-# 15% (n=3) were estimated to exhibit 2 behaviors
-# 30% (n=6) were estimated to exhibit 4 behaviors
+# AIC suggested 4 sims w/ 4 states
+# BIC suggested 5 sims w/ 4 states
+# holistic evaluation resulted in all sims using 3 states
 
 
 ### Sticking w/ K=3 for direct comparison
@@ -298,7 +181,7 @@ hmm.states %>%
   tally() %>% 
   mutate(acc = n/track_length) %>% 
   summarise(min=min(acc), max=max(acc), mean=mean(acc))
-# accuracy ranges from 6.8% to 89.6%
+# accuracy ranges from 78.1% to 88.4%
 
 # For 'Resting' behavior
 rest.size<- hmm.states %>% 
@@ -313,7 +196,7 @@ hmm.states %>%
   left_join(., rest.size, by = "ID") %>% 
   mutate(acc = n.x/n.y) %>% 
   summarise(min=min(acc), max=max(acc), mean=mean(acc))
-# accuracy ranges from 4.3% to 100.0%
+# accuracy ranges from 80.2% to 90.2%
 
 # For 'ARS' behavior
 ars.size<- hmm.states %>% 
@@ -328,7 +211,7 @@ hmm.states %>%
   left_join(., ars.size, by = "ID") %>% 
   mutate(acc = n.x/n.y) %>% 
   summarise(min=min(acc), max=max(acc), mean=mean(acc))
-# accuracy ranges from 8.4% to 100.0%
+# accuracy ranges from 72.5% to 88.0%
 
 # For 'Transit' behavior
 transit.size<- hmm.states %>% 
@@ -343,7 +226,7 @@ hmm.states %>%
   left_join(., transit.size, by = "ID") %>% 
   mutate(acc = n.x/n.y) %>% 
   summarise(min=min(acc), max=max(acc), mean=mean(acc))
-# accuracy ranges from 5.3% to 100.0%
+# accuracy ranges from 74.0% to 90.0%
 
 
 
@@ -356,7 +239,7 @@ hmm.states %>%
   tally() %>% 
   mutate(acc = n/track_length) %>% 
   summarise(min=min(acc), max=max(acc), mean=mean(acc))
-# accuracy ranges from 4.8% to 92.6%
+# accuracy ranges from 90.3% to 94.1%
 
 # For 'Resting' behavior
 rest.size<- hmm.states %>% 
@@ -371,7 +254,7 @@ hmm.states %>%
   left_join(., rest.size, by = "ID") %>% 
   mutate(acc = n.x/n.y) %>% 
   summarise(min=min(acc), max=max(acc), mean=mean(acc))
-# accuracy ranges from 0.04% to 100.0%
+# accuracy ranges from 92.9% to 97.7%
 
 # For 'ARS' behavior
 ars.size<- hmm.states %>% 
@@ -386,7 +269,7 @@ hmm.states %>%
   left_join(., ars.size, by = "ID") %>% 
   mutate(acc = n.x/n.y) %>% 
   summarise(min=min(acc), max=max(acc), mean=mean(acc))
-# accuracy ranges from 1.7% to 100.0%
+# accuracy ranges from 76.5% to 89.4%
 
 # For 'Transit' behavior
 transit.size<- hmm.states %>% 
@@ -401,7 +284,7 @@ hmm.states %>%
   left_join(., transit.size, by = "ID") %>% 
   mutate(acc = n.x/n.y) %>% 
   summarise(min=min(acc), max=max(acc), mean=mean(acc))
-# accuracy ranges from 0.23% to 100.0%
+# accuracy ranges from 93.1% to 98.9%
 
 
 # Export data and results

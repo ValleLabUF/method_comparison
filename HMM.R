@@ -142,7 +142,7 @@ for (i in 1:length(hmm.res)) {
 # Identify K per BIC
 k.optim_BIC<- c(3, 3, 3, 3, 3,
                 3, 3, 3, 3, 3,
-                3, 4, 4, 4, 4,
+                3, 3, 4, 4, 4,
                 3, 3, 3, 4, 3)
 
 # Identify K per AIC, BIC, and density distributions
@@ -153,7 +153,7 @@ k.optim<- c(3, 3, 3, 3, 3,
 
 table(k.optim)/20
 # AIC suggested 4 sims w/ 4 states
-# BIC suggested 5 sims w/ 4 states
+# BIC suggested 4 sims w/ 4 states
 # holistic evaluation resulted in all sims using 3 states
 
 

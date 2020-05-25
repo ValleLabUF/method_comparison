@@ -75,6 +75,12 @@ theta.estim<- theta.post %>%
 # theta.estim_export<- theta.estim %>% map(., as.data.frame) %>% bind_rows(., .id = 'id')
 # write.csv(theta.estim_export, "theta_estim.csv", row.names = F)
 
+#read-in data
+# theta.estim<- read.csv("theta_estim.csv", as.is=T)
+# theta.estim<- theta.estim %>% group_split(., id, keep=F)
+
+
+
 #boxplots
 par(mfrow=c(2,2), ask = T)
 for (i in 1:length(res)) {
@@ -109,7 +115,7 @@ for (i in 1:length(behav.res)) {
           axis.text.x.bottom = element_text(size = 12),
           strip.text = element_text(size = 14), strip.text.x = element_text(face = "bold")) +
     scale_fill_viridis_d(guide = F) +
-    facet_grid(behav ~ param, scales = "fixed")
+    facet_grid(behav ~ param, scales = "free_x")
   )
 }
 par(ask=F)
@@ -158,6 +164,7 @@ behav.order<- list(c(1,3,2), c(1,2,3), c(2,3,1), c(1,3,2), c(2,3,1),
                    c(1,3,2), c(2,3,1), c(2,3,1), c(2,3,1), c(1,2,3),
                    c(2,1,3), c(1,2,3), c(2,1,3), c(2,3,1), c(1,3,2),
                    c(1,3,2), c(1,2,3), c(2,3,1), c(2,3,1), c(2,3,1))
+
 names(behav.order)<- names(theta.estim)
 
 
@@ -230,15 +237,13 @@ par(ask=F)
 
 #assign behavior from sim to data
 dat2<- list()
-for (i in 1:length(theta.estim2)) {  #assign behaviors to all obs
-  theta.estim2[[i]]<- cbind(id = names(theta.estim)[i], theta.estim2[[i]])
-  names(theta.estim2[[i]])[3:5]<- behav.order[[i]]
-  dat2[[i]]<- assign_behav(dat.list = dat.list[i], theta.estim2 = theta.estim2[[i]])
+for (i in 1:length(theta.estim.long)) {  #assign behaviors to all obs
+  theta.estim.long[[i]]<- cbind(id = names(dat.list)[i], theta.estim.long[[i]])
+  dat2[[i]]<- assign_behav(dat.list = dat.list[i], theta.estim.long = theta.estim.long[[i]],
+                           behav.names = c("Encamped","ARS","Transit"))
 }
 
-dat2<- map(dat2, . %>%  #reorder rows for behav and prop cols
-            mutate_at(vars(behav, prop), function(x) x[c(length(x),1:(length(x)-1))])) %>%
-  map_dfr(`[`)
+dat2<- map_dfr(dat2, `[`)
 
 
 ## Plot tracks with modeled behaviors

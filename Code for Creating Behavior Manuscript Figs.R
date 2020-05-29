@@ -29,41 +29,61 @@ ggsave("Figure 1a.png", width = 6, height = 4, units = "in", dpi = 330)
 
 
 
-## Discretized Movmt Param Histograms
-dat2_focal_long<- dat2_focal %>% 
-  dplyr::select(id,SL,TA) %>% 
-  gather(key, value, -id) %>% 
-  group_by(key, value) %>%
-  summarise(n=n()) %>% 
-  drop_na() %>% 
-  mutate(prop=n/sum(n)) %>%
-  ungroup()
+## Discretized Movmt Param Distribs
+behav.df<- map_dfr(behav.list, `[`)
 
-names(dat2_focal_long)[1:2]<- c("param","bin")
-dat2_focal_long$param<- factor(dat2_focal_long$param)
-levels(dat2_focal_long$param)<- c("Step Length", "Turning Angle")
-
-ggplot(data = dat2_focal_long, aes(bin, prop)) +
-  geom_bar(stat = "identity", fill = "grey45", color = "black") +
-  labs(x = "Bin", y = "Proportion") +
+ggplot(behav.df %>% filter(id == '2_2'), aes(x=dist)) +
+  geom_density(fill = "grey55") +
+  geom_segment(data = data.frame(dist.bin.lims), aes(x=dist.bin.lims, xend=dist.bin.lims,
+                                                     y=0, yend=0.4),
+               linetype = "dashed", lwd = 1) +
   theme_bw() +
-  facet_wrap(~param, nrow = 2, scales = "free_x") +
-  scale_x_continuous(breaks = 1:8) +
   theme(panel.grid = element_blank(),
-        axis.title = element_text(size = 20, face = "bold"),
-        axis.text.x = element_text(size = 16),
-        axis.text.y = element_blank(),
-        axis.ticks.y = element_blank(),
-        strip.text = element_text(size = 16, face = "bold"))
+        axis.title = element_text(size = 24, face = "bold"),
+        axis.text = element_blank(),
+        axis.ticks = element_blank()) +
+  labs(x = "Step Length", y = "Density") +
+  annotate("segment", x = mean(dist.bin.lims[1:2]), xend = -2, y = 0.4, yend = 0.42,
+           colour = "black") +
+  annotate("segment", x = mean(dist.bin.lims[2:3]), xend = mean(dist.bin.lims[2:3]),
+           y = 0.4, yend = 0.42, colour = "black") +
+  annotate("text",
+           x = c(-3, mean(dist.bin.lims[2:3]), mean(dist.bin.lims[3:4]),
+                                  mean(dist.bin.lims[4:5]), mean(dist.bin.lims[5:6])),
+           y = c(0.44, 0.44, 0.4, 0.4, 0.4),
+           label = paste("Bin", 1:5),
+           size = 7)
 
-ggsave("Figure 1b.png", width = 6, height = 4, units = "in", dpi = 330)
+ggsave("Figure 1b.png", width = 9, height = 6, units = "in", dpi = 330)
+
+
+ggplot(behav.df %>% filter(id == '2_2'), aes(x=rel.angle)) +
+  geom_density(fill = "grey55") +
+  geom_segment(data = data.frame(angle.bin.lims), aes(x=angle.bin.lims, xend=angle.bin.lims,
+                                                     y=0, yend=0.25),
+               linetype = "dashed", lwd = 1) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        axis.title = element_text(size = 24, face = "bold"),
+        axis.text = element_blank(),
+        axis.ticks = element_blank()) +
+  labs(x = "Turning Angle (rad)", y = "Density") +
+  annotate("text",
+           x = (pi/8) + angle.bin.lims[1:8],
+           y = rep(0.25, 8),
+           label = paste("Bin", 1:8),
+           size = 7)
+
+ggsave("Figure 1c.png", width = 9, height = 6, units = "in", dpi = 330)
+
+
 
 
 
 
 ## Segmentation Heatmap
 # plot.heatmap(data = list(behav.list$`2_2`[1:5000,]), nbins = c(5,8), brkpts = brkpts[7,],
-             dat.res = dat.res, type = "behav", title = F, legend = T)
+             # dat.res = dat.res, type = "behav", title = F, legend = T)
 
 nbins = c(5,8)
 data<- behav.list$`2_2`
@@ -112,7 +132,7 @@ ggplot(behav.heat_long, aes(x=time, y=key, fill=value)) +
           legend.position = "top",
           legend.text = element_text(size = 16))
 
-ggsave("Figure 1c.png", width = 7, height = 5, units = "in", dpi = 330)
+ggsave("Figure 1d.png", width = 7, height = 5, units = "in", dpi = 330)
   
   
   
@@ -140,7 +160,7 @@ ggplot(behav.res_focal, aes(x = bin, y = prop, fill = as.factor(behav))) +
   scale_fill_manual(values = viridis(n=3), guide = F) +
   facet_grid(behav ~ param, scales = "free_x")
 
-ggsave("Figure 1d.png", width = 6, height = 4, units = "in", dpi = 330)
+ggsave("Figure 1e.png", width = 6, height = 4, units = "in", dpi = 330)
 
 
 
@@ -169,7 +189,7 @@ ggplot(theta.estim.long_focal) +
         legend.text = element_text(size = 16),
         plot.margin = margin(5,20,5,5))
 
-ggsave("Figure 1e.png", width = 6, height = 4, units = "in", dpi = 330)
+ggsave("Figure 1f.png", width = 6, height = 4, units = "in", dpi = 330)
 
 
 
@@ -190,7 +210,7 @@ ggplot(data = dat2_focal %>% slice(2:n()), aes(x,y)) +
                              title.theme = element_text(size = 14))) +
   coord_cartesian()
 
-ggsave("Figure 1f.png", width = 6, height = 4, units = "in", dpi = 330)
+ggsave("Figure 1g.png", width = 6, height = 4, units = "in", dpi = 330)
 
 
 

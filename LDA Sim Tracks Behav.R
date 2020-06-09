@@ -2,6 +2,8 @@
 #### Run LDA Model ####
 #######################
 
+set.seed(123)
+
 setwd("~/Documents/Snail Kite Project/Data/R Scripts/ValleLabUF/git_LDA_behavior")
 
 
@@ -99,7 +101,8 @@ purrr::map(theta.estim, function(x) round(colSums(x)/nrow(x), digits = 3)) %>%
 ## First 3 behaviors have mean of 97.5% and SD=0.04
 
 ## Viz histograms from model
-behav.res<- purrr::map(res, get_behav_hist, dat_red = dat_red) %>% 
+behav.res<- purrr::map(res, get_behav_hist, nburn = nburn, ngibbs = ngibbs,
+                       nmaxclust = nmaxclust, var.names = c("Step Length", "Turning Angle")) %>% 
   purrr::map(., function(x) x[x$behav <= 3,])  #only select the top 3 behaviors
 
 
@@ -156,14 +159,14 @@ for (i in 1:length(dat.list)) {
 
 
 #Need to manually inspect all histograms and assign proper order (slowest to fastest)
-# behav.order<- list(c(3,1,2), c(2,1,3), c(3,2,1), c(2,1,3), c(3,2,1),
-#                    c(2,3,1), c(1,3,2), c(2,1,3), c(2,3,1), c(2,3,1),
-#                    c(2,3,1), c(2,1,3), c(2,1,3), c(1,2,3), c(1,3,2),
-#                    c(3,1,2), c(2,1,3), c(2,3,1), c(3,2,1), c(3,1,2))
-behav.order<- list(c(1,3,2), c(1,2,3), c(2,3,1), c(1,3,2), c(2,3,1),
-                   c(1,3,2), c(2,3,1), c(2,3,1), c(2,3,1), c(1,2,3),
-                   c(2,1,3), c(1,2,3), c(2,1,3), c(2,3,1), c(1,3,2),
-                   c(1,3,2), c(1,2,3), c(2,3,1), c(2,3,1), c(2,3,1))
+behav.order<- list(c(3,1,2), c(1,3,2), c(2,1,3), c(2,3,1), c(2,3,1),
+                   c(2,1,3), c(2,1,3), c(2,1,3), c(2,1,3), c(2,3,1),
+                   c(2,1,3), c(2,1,3), c(2,1,3), c(1,2,3), c(2,3,1),
+                   c(3,1,2), c(1,3,2), c(2,1,3), c(3,1,2), c(3,2,1))
+# behav.order<- list(c(1,3,2), c(1,2,3), c(2,3,1), c(1,3,2), c(2,3,1),
+#                    c(1,3,2), c(2,3,1), c(2,3,1), c(2,3,1), c(1,2,3),
+#                    c(2,1,3), c(1,2,3), c(2,1,3), c(2,3,1), c(1,3,2),
+#                    c(1,3,2), c(1,2,3), c(2,3,1), c(2,3,1), c(2,3,1))
 
 names(behav.order)<- names(theta.estim)
 

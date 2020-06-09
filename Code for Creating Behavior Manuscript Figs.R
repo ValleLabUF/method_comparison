@@ -291,44 +291,63 @@ setwd("~/Documents/Manuscripts/Bayesian Behavior Estimation Model/Figures")
 
 
 ## Part a: segmentation heatmap
-data<- behav.list$`2_2`  #ID 2_2
+data<- behav.list2$`2_2`  #ID 2_2
 nbins<- c(5,8)
 behav.heat<- behav.seg.image(data, nbins)
 
 SL<- data.frame(behav.heat$SL)
 names(SL)<- 1:nbins[1]
-SL<- SL %>% gather(key, value) %>% mutate(time=rep(data$time1, times=nbins[1]),
+SL<- SL %>% gather(key, value) %>% mutate(time=rep(behav.list[["2_2"]]$time1, times=nbins[1]),
                                           behav=rep("Step Length", nrow(data)*nbins[1]))
 
 TA<- data.frame(behav.heat$TA)
 names(TA)<- 1:nbins[2]
-TA<- TA %>% gather(key, value) %>% mutate(time=rep(data$time1, times=nbins[2]),
+TA<- TA %>% gather(key, value) %>% mutate(time=rep(behav.list[["2_2"]]$time1, times=nbins[2]),
                                           behav=rep("Turning Angle", nrow(data)*nbins[2]))
 
 behav.heat_long<- rbind(SL,TA)
 behav.heat_long$value<- factor(behav.heat_long$value)
 levels(behav.heat_long$value)<- c("Unoccupied","Occupied")
 
-ind=which(unique(data$id) == brkpts$id)
-breakpt<- brkpts[ind,-1] %>% purrr::discard(is.na) %>% t() %>% data.frame()
-names(breakpt)<- "breaks"
+breakpt<- bayes.brkpts %>% 
+  filter(id == unique(data$id) & type == "Model") %>% 
+  dplyr::select(brks) %>% 
+  rename(breaks = brks)
+
+true.brks<- data.frame(t(true.brkpts[7,-1])) %>%
+  drop_na() %>% 
+  rename(breaks = X7) %>% 
+  pull(breaks)
+
+ticks.bottom<-data.frame(x=true.brks, y=0.5, xend=true.brks, yend=1.5)
+ticks.top<- data.frame(x=rep(true.brks, 2), y=NA, xend=rep(true.brks, 2), yend=NA)
+# ticks.top$y<- rep(c(4.5,7.5), each = length(true.brks))
+# ticks.top$yend<- rep(c(5.5,8.5), each = length(true.brks))
+ticks.top$y<- rep(7.5, length(true.brks))
+ticks.top$yend<- rep(8.5, length(true.brks))
+ticks.top$behav<- rep(c("Step Length","Turning Angle"), each = length(true.brks))
 
 
-
-p.seg<- ggplot(behav.heat_long, aes(x=time, y=key, fill=value)) +
-  geom_tile(alpha = 0.5) +
+p.seg<- ggplot(behav.heat_long, aes(x=time#, y=key
+                                    )) +
+  # geom_tile(fill="n") +
   facet_wrap(~behav, scales = 'free', nrow = 2) +
   scale_fill_viridis_d('') +
   scale_y_discrete(expand = c(0,0)) +
   scale_x_continuous(expand = c(0,0)) +
   geom_vline(data = breakpt, aes(xintercept = breaks - 0.5), color = viridis(n=9)[7],
              size = 1, alpha = 1) +
-  geom_vline(data = data.frame(t(true.brkpts[7,-1])) %>% drop_na() %>% rename(breaks = X7),
-             aes(xintercept = breaks - 0.5), color = "blue", size = 0.4, alpha = 1) +
-  labs(x = "\nTime", y = "Bin\n") +
+  geom_segment(data = ticks.top, aes(x = x, xend = xend, y = y, yend = yend#, group = behav
+                                     ),
+               color = "black", size = 1, alpha = 1) +
+  geom_segment(data = ticks.bottom, aes(x = x, xend = xend, y = y, yend = yend), color = "black",
+               size = 1, alpha = 1) +
+  labs(x = "\nTime", y = "\n") +
   theme_bw() +
   theme(axis.title = element_text(size = 16),
-        axis.text = element_text(size = 12),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
         strip.text = element_text(size = 12, face = 'bold'),
         plot.title = element_text(size = 20, hjust = 0, vjust = -6),
         plot.margin = margin(0, 1, 0.5, 0.5, "cm"),
@@ -344,45 +363,19 @@ p.seg<- ggplot(behav.heat_long, aes(x=time, y=key, fill=value)) +
 ## Part b: behavior histogram
 
 #calculate true proportions of SL and TA by behavior for all bins for ID 2_2
-tmp1<- dat %>% filter(id == "2_2")
-b.list<- list()
+true.b<- extract.behav.props(dat = dat, id1 = "2_2", behav.col = "behav_coarse",
+                             dist.bin.lims = dist.bin.lims, angle.bin.lims = angle.bin.lims)
 
-for (j in 1:max(tmp1$behav_coarse, na.rm = T)) {
-  tmp2<- tmp1 %>% filter(behav_coarse == j)
-  
-  true.SL.props<- vector()
-  true.TA.props<- vector()
-  for (i in 2:length(dist.bin.lims)) {
-    true.SL.props[i-1]<- length(which(tmp2$dist < dist.bin.lims[i] & 
-                                        tmp2$dist > dist.bin.lims[i-1])) / nrow(tmp2)
-  }
-  for (i in 2:length(angle.bin.lims)) {
-    true.TA.props[i-1]<- length(which(tmp2$rel.angle < angle.bin.lims[i] & 
-                                        tmp2$rel.angle > angle.bin.lims[i-1])) / nrow(tmp2)
-  }
-  b.list[[j]]<- data.frame(behav = j, param = rep(c("Step Length","Turning Angle"), c(5,8)),
-                           bin = c(1:5,1:8), prop = c(true.SL.props, true.TA.props))
-}
-
-true.b<- bind_rows(b.list)
-true.b$behav<- true.b$behav %>% 
+bayes.b<- behav.res[[7]]
+bayes.b$behav<- bayes.b$behav %>% 
   as.character() %>% 
-  str_replace_all(., "1", "Encamped") %>% 
-  str_replace_all(., "2", "ARS") %>% 
-  str_replace_all(., "3", "Transit") %>% 
+  str_replace_all(., "1", "ARS") %>% 
+  str_replace_all(., "2", "Encamped") %>%
+  str_replace_all(., "3", "Transit") %>%
   factor(., levels = c("Encamped","ARS","Transit"))
 
-behav.res<- behav.res[[7]]
-behav.res$param<- str_replace_all(behav.res$param, "SL", "Step Length") %>% 
-  str_replace_all(., "TA", "Turning Angle")
-behav.res$behav<- behav.res$behav %>% 
-  as.character() %>% 
-  str_replace_all(., "1", "Encamped") %>% 
-  str_replace_all(., "2", "ARS") %>% 
-  str_replace_all(., "3", "Transit") %>% 
-  factor(., levels = c("Encamped","ARS","Transit"))
 
-p.hist<- ggplot(behav.res, aes(x = bin, y = prop, fill = as.factor(behav))) +
+p.hist<- ggplot(bayes.b, aes(x = bin, y = prop, fill = behav)) +
   geom_bar(stat = 'identity') +
   geom_point(data = true.b, aes(x=bin, y=prop, group = behav), pch=21, size = 2, fill="white",
              color="black", stroke=1) +
@@ -422,13 +415,13 @@ true.dat1$behavior<- true.dat1$behavior %>%
 p.prop<- ggplot() +
   geom_line(data = dat1,
             aes(x=date, y=prop, color = behavior),
-            size = 1) +
-  scale_color_manual(values = viridis(n=20)[c(1,9,18)], guide=F) +
+            size = 1.5) +
+  scale_color_manual(values = c(viridis(n=20)[c(1,9)], "gold3"), guide=F) +
   new_scale_color() +
   geom_line(data = true.dat1,
             aes(x=time1, y=prop, color = behavior),
-            size = 0.55) +
-  scale_color_manual(values = viridis(n=20)[c(7,13,20)], guide=F) +
+            size = 0.75) +
+  scale_color_manual(values = c(viridis(n=20)[c(7,13)], "gold2"), guide=F) +
   labs(x = "\nTime", y = "Proportion of Behavior\n") +
   theme_bw() +
   theme(axis.title = element_text(size = 16),
@@ -451,4 +444,215 @@ grid.arrange(p.seg, p.hist, p.prop, heights = c(0.2, 1, 0.1, 1), layout_matrix =
                                                                                        c(3, 3)))
 # dev.off()
 
-# ggsave("Figure 4 (results from sim).png", width = 4, height = 6, units = "in", dpi = 330)
+
+
+
+##################
+#### Figure X ####
+##################
+
+### Gamma/Wrapped Cauchy
+
+names(hmm.res)[4:5]<- c("dist","rel.angle")
+
+#calculate true proportions of SL and TA by behavior for all bins for ID 1_1, as well as props from HMM
+
+# id1<- c("2_1","2_2","2_3","2_4")
+# trk.len<- c("1000","5000","10000","50000")
+# true.b<- list()
+# for (i in 1:length(id1)) {
+#   true.b[[i]]<- extract.behav.props(dat = dat, id1 = id1[i], behav.col = "behav_coarse",
+#                                     dist.bin.lims = dist.bin.lims,
+#                                     angle.bin.lims = angle.bin.lims)
+#   true.b[[i]]$track_length<- trk.len[i]
+# }
+# true.b<- bind_rows(true.b)
+# true.b$track_length<- factor(true.b$track_length, levels = trk.len)
+true.b<- extract.behav.props(dat = dat, id1 = '3_1', behav.col = "behav_coarse",
+                                  dist.bin.lims = dist.bin.lims,
+                                  angle.bin.lims = angle.bin.lims)
+
+
+# hmm.b<- list()
+# for (i in 1:length(id1)) {
+#   hmm.b[[i]]<- extract.behav.props(dat = hmm.res, id1 = id1[i], behav.col = "state",
+#                                     dist.bin.lims = dist.bin.lims,
+#                                     angle.bin.lims = angle.bin.lims)
+#   hmm.b[[i]]$track_length<- trk.len[i]
+# }
+# hmm.b<- bind_rows(hmm.b)
+# hmm.b$track_length<- factor(hmm.b$track_length, levels = trk.len)
+hmm.b<- extract.behav.props(dat = hmm.res, id1 = "3_1", behav.col = "state",
+                            dist.bin.lims = dist.bin.lims,
+                            angle.bin.lims = angle.bin.lims)
+
+p.hmm<- ggplot(hmm.b, aes(x = bin, y = prop, fill = behav)) +
+  geom_bar(stat = 'identity') +
+  geom_point(data = true.b, aes(x=bin, y=prop, group = behav), pch=21, size = 2, fill="white",
+             color="black", stroke=1) +
+  labs(x = "\nBin", y = "Proportion\n", title = "HMM (Gamma/Wrapped Cauchy)") +
+  theme_bw() +
+  theme(axis.title = element_text(size = 16),
+        axis.text.y = element_text(size = 14),
+        axis.text.x.bottom = element_text(size = 12),
+        strip.text = element_text(size = 14),
+        strip.text.x = element_text(face = "bold"),
+        panel.grid = element_blank(),
+        plot.title = element_text(size = 16, face = "bold")) +
+  scale_fill_manual(values = viridis(n=3), guide = F) +
+  scale_y_continuous(breaks = c(0.00, 0.50, 1.00), limits = c(0,1)) +
+  scale_x_continuous(breaks = 1:8) +
+  facet_grid(behav ~ param, scales = "free_x")
+
+
+#--------------------------------
+
+### Weibull/Von Mises
+names(hmm2.res)[4:5]<- c("dist","rel.angle")
+
+#calculate proportions of SL and TA by behavior for all bins for ID 1_1 from HMM
+
+hmm2.b<- extract.behav.props(dat = hmm2.res, id1 = "1_1", behav.col = "state",
+                             dist.bin.lims = dist.bin.lims, angle.bin.lims = angle.bin.lims)
+
+
+p.hmm2<- ggplot(hmm2.b, aes(x = bin, y = prop, fill = behav)) +
+  geom_bar(stat = 'identity') +
+  geom_point(data = true.b, aes(x=bin, y=prop, group = behav), pch=21, size = 2, fill="white",
+             color="black", stroke=1) +
+  labs(x = "\nBin", y = "Proportion\n", title = "HMM (Weibull/Von Mises)") +
+  theme_bw() +
+  theme(axis.title = element_text(size = 16),
+        axis.text.y = element_text(size = 14),
+        axis.text.x.bottom = element_text(size = 12),
+        strip.text = element_text(size = 14),
+        strip.text.x = element_text(face = "bold"),
+        panel.grid = element_blank(),
+        plot.title = element_text(size = 16, face = "bold")) +
+  scale_fill_manual(values = viridis(n=3), guide = F) +
+  scale_y_continuous(breaks = c(0.00, 0.50, 1.00), limits = c(0,1)) +
+  scale_x_continuous(breaks = 1:8) +
+  facet_grid(behav ~ param, scales = "free_x")
+
+
+#--------------------------------
+
+### Bayesian
+#calculate true proportions of SL and TA by behavior for all bins for ID 1_1 for Bayesian model
+bayes.b<- behav.res[[3]]
+# bayes.b$param<- str_replace_all(bayes.b$param, "SL", "Step Length") %>% 
+#   str_replace_all(., "TA", "Turning Angle")
+bayes.b$behav<- bayes.b$behav %>% 
+  as.character() %>% 
+  str_replace_all(., "1", "ARS") %>% 
+  str_replace_all(., "2", "Encamped") %>%
+  str_replace_all(., "3", "Transit") %>%
+  factor(., levels = c("Encamped","ARS","Transit"))
+
+
+
+p.bayes<- ggplot(bayes.b, aes(x = bin, y = prop, fill = behav)) +
+  geom_bar(stat = 'identity') +
+  geom_point(data = true.b, aes(x=bin, y=prop, group = behav), pch=21, size = 2, fill="white",
+             color="black", stroke=1) +
+  labs(x = "\nBin", y = "Proportion\n", title = "Bayesian") +
+  theme_bw() +
+  theme(axis.title = element_text(size = 16),
+        axis.text.y = element_text(size = 14),
+        axis.text.x.bottom = element_text(size = 12),
+        strip.text = element_text(size = 14),
+        strip.text.x = element_text(face = "bold"),
+        panel.grid = element_blank(),
+        plot.title = element_text(size = 16, face = "bold")) +
+  scale_fill_manual(values = viridis(n=3), guide = F) +
+  scale_y_continuous(breaks = c(0.00, 0.50, 1.00), limits = c(0,1)) +
+  scale_x_continuous(breaks = 1:8) +
+  facet_grid(behav ~ param, scales = "free_x")
+
+
+
+### Calculate sum of squared errors
+
+#Bayesian
+bayes.sse<- list()
+for (i in 1:length(behav.res)) {
+  true.b<- extract.behav.props(dat = dat, id1 = unique(dat$id)[i], behav.col = "behav_coarse",
+                                    dist.bin.lims = dist.bin.lims,
+                                    angle.bin.lims = angle.bin.lims)
+  
+  bayes.b<- behav.res[[i]]
+  bayes.b$param<- str_replace_all(bayes.b$param, "SL", "Step Length") %>% 
+    str_replace_all(., "TA", "Turning Angle")
+  bayes.b$behav<- bayes.b$behav %>% 
+    as.character() %>% 
+    str_replace_all(., paste(behav.order[[i]][1]), "Encamped") %>% 
+    str_replace_all(., paste(behav.order[[i]][2]), "ARS") %>%
+    str_replace_all(., paste(behav.order[[i]][3]), "Transit") %>%
+    factor(., levels = c("Encamped","ARS","Transit"))
+  bayes.b<- bayes.b %>% 
+    group_by(param) %>% 
+    arrange(behav) %>% 
+    ungroup()
+  
+  bayes.sse[[i]]<- sum((bayes.b$prop - true.b$prop)^2)  #SSE
+  names(bayes.sse)[i]<- unique(dat$id)[i]
+}
+bayes.sse<- bind_rows(bayes.sse) %>% 
+  t() %>% 
+  as.vector()
+
+
+
+
+#HMM
+hmm.sse<- list()
+for (i in 1:length(behav.res)) {
+  true.b<- extract.behav.props(dat = dat, id1 = unique(dat$id)[i], behav.col = "behav_coarse",
+                               dist.bin.lims = dist.bin.lims,
+                               angle.bin.lims = angle.bin.lims)
+  
+  hmm.b<- extract.behav.props(dat = hmm.res, id1 = unique(dat$id)[i], behav.col = "state",
+                              dist.bin.lims = dist.bin.lims,
+                              angle.bin.lims = angle.bin.lims)
+  
+  hmm.sse[[i]]<- sum((hmm.b$prop - true.b$prop)^2)  #SSE
+  names(hmm.sse)[i]<- unique(dat$id)[i]
+}
+hmm.sse<- bind_rows(hmm.sse) %>% 
+  t() %>% 
+  as.vector()
+
+
+sse.df<- data.frame(id = rep(unique(dat$id), 2),
+                    track_length = factor(rep(rep(c(1000,5000,10000,50000), each = 5), 2),
+                                          levels = c("1000","5000","10000","50000")),
+                    sse = c(bayes.sse, hmm.sse),
+                    method = rep(c("Bayesian","HMM"), each = 20))
+
+
+ggplot(sse.df, aes(track_length, sse, fill = method, color = method)) +
+  geom_boxplot() +
+  stat_summary(geom = "crossbar", width = 0.6, fatten=1.5, color="black",
+               position = position_dodge(0.75),
+               fun.data = function(x){c(y=median(x), ymin=median(x), ymax=median(x))}) +
+  labs(x="\nTrack Length (observations)", y = "Sum of Squared Errors\n") +
+  scale_fill_manual("", values = wes_palette("Zissou1")[c(1,5)]) +
+  scale_color_manual("", values = wes_palette("Zissou1")[c(1,5)]) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        axis.title = element_text(size = 16),
+        axis.text = element_text(size = 14),
+        legend.position = "top",
+        legend.text = element_text(size = 10))
+
+
+#plot all results
+grid.arrange(p.bayes, p.hmm, ncol = 2)
+
+plot_grid(NULL, NULL, NULL,
+          p.hmm, NULL, p.hmm2,
+          NULL, NULL, NULL,
+          p.bayes, NULL, NULL,
+          align = "hv", nrow = 4, rel_widths = c(1,0.1,1), rel_heights = c(0.2,1,0.1,1))
+
+ggsave("Figure X (behav hist comparison).png", width = 12, height = 12, units = "in", dpi = 330)

@@ -9,13 +9,15 @@ library(cowplot)
 library(viridis)
 library(ggnewscale)
 
+source('helper functions.R')
+
 
 # Load elapsed time
 seg.time<- read.csv("Bayesian_elapsed_time.csv")
 lda.time<- read.csv("LDA_elapsed_time.csv")
 bcpa.time<- read.csv("BCPA_elapsed_time.csv")
 hmm.time<- read.csv("HMM_elapsed_time.csv")
-hmm2.time<- read.csv("HMM2_elapsed_time.csv")
+# hmm2.time<- read.csv("HMM2_elapsed_time.csv")
 
 # Load breakpoints
 bayes.brkpts<- read.csv("Bayesian_allbreakpts.csv")
@@ -25,7 +27,7 @@ bcpa.brkpts<- read.csv("BCPA_allbrkpts.csv")
 bayes.res<- read.csv("Modeled MM Sim Tracks w Behav.csv")
 # bcpa.res<- read.csv("Clustered BCPA data.csv")
 hmm.res<- read.csv("HMM results.csv")
-hmm2.res<- read.csv("HMM2 results.csv")
+# hmm2.res<- read.csv("HMM2 results.csv")
 
 # Load true breakpoints
 true.brkpts<- read.csv("CRW_MM_sim_brkpts.csv", as.is = T)
@@ -119,6 +121,7 @@ p.brk<- ggplot(brkpt.acc, aes(track_length, freq, fill = method, color = method)
   labs(x="\nTrack Length (observations)", y = "Proportion of Accurate Breakpoints\n") +
   scale_fill_manual("", values = wes_palette("Zissou1")[c(1,3)], guide = F) +
   scale_color_manual("", values = wes_palette("Zissou1")[c(1,3)], guide = F) +
+  ylim(0,1) +
   theme_bw() +
   theme(axis.title = element_text(size = 16),
         axis.text = element_text(size = 14),
@@ -152,21 +155,57 @@ all.brkpts %>%
 bayes.res$method<- rep("Bayesian", nrow(bayes.res))
 # bcpa.res$method<- rep("BCPA/K-means", nrow(bcpa.res))
 hmm.res$method<- rep("HMM", nrow(hmm.res))
-hmm2.res$method<- rep("HMM2", nrow(hmm2.res))
+# hmm2.res$method<- rep("HMM2", nrow(hmm2.res))
 
 bayes.res<- bayes.res %>% 
-  rename(state = behav) #%>% 
-  # mutate_at("state", ~factor(., levels = c("Encamped","ARS","Transit"))) %>% 
-  # mutate_at("state", as.numeric)
+  rename(state = behav) %>% 
+  mutate_at("state", ~factor(., levels = c("Encamped","ARS","Transit"))) %>%
+  mutate_at("state", as.numeric)
 # bcpa.res<- bcpa.res %>% rename(state = cluster)
 hmm.res<- hmm.res %>% rename(state = hmm.state, id = ID)
-hmm2.res<- hmm2.res %>% rename(state = hmm.state, id = ID)
+# hmm2.res<- hmm2.res %>% rename(state = hmm.state, id = ID)
+
+
+# Modify hmm.res to be same as bayes.res format
+# calc proportions of behaviors by true time segment and then identify dominant behavior
+hmm.res2<- hmm.res %>% 
+  df.to.list(., ind = "id") %>% 
+  purrr::map(., ~mutate(., time1 = 1:nrow(.))) %>% 
+  purrr::map(., assign.time.seg, brkpts = true.brkpts) %>% 
+  bind_rows() %>% 
+  drop_na() %>%
+  mutate_at("state", as.factor) %>%
+  group_by(id, tseg, state) %>% 
+  count(state, .drop = FALSE) %>% 
+  group_by(id, tseg) %>% 
+  mutate(prop = n/sum(n)) %>% 
+  rename(behavior = state) %>% 
+  uncount(sum(n), .id = "time2") %>%
+  arrange(id, tseg, time2) %>%
+  group_by(id) %>%
+  mutate(time1 = rep(1:(n()/3), each = 3)) %>% 
+  dplyr::select(-c(time2, n)) %>% 
+  pivot_wider(names_from = behavior, values_from = prop) %>% 
+  mutate(track_length = max(time1)) %>% 
+  ungroup() %>% 
+  mutate(state = apply(.[,4:6], 1, which.max)) %>% 
+  mutate_at("id", as.character) %>% 
+  arrange(track_length, id) %>% 
+  dplyr::select(-track_length)
+
+hmm.res3<- hmm.res %>% 
+  dplyr::select(-state) %>% 
+  df.to.list("id") %>% 
+  map2(.,
+       df.to.list(hmm.res2, "id") %>% map(., ~rbind(c(unique(.$id), rep(NA, 7)), .)),
+       ~cbind(.x, .y)) %>% 
+  bind_rows()
+  
 
 # Combine all datasets
 res<- rbind(bayes.res[,c("id","behav_fine","behav_coarse","track_length","state","method")],
             # bcpa.res[,c("id","behav_fine","behav_coarse","track_length","state","method")],
-            hmm.res[,c("id","behav_fine","behav_coarse","track_length","state","method")],
-            hmm2.res[,c("id","behav_fine","behav_coarse","track_length","state","method")])
+            hmm.res3[,c("id","behav_fine","behav_coarse","track_length","state","method")])
 
 
 
@@ -192,7 +231,7 @@ summ.stats_coarse<- res %>%
 summ.stats_coarse$track_length<- summ.stats_coarse$track_length %>% 
   factor(., levels = c('1000','5000','10000','50000'))
 summ.stats_coarse<- summ.stats_coarse %>% 
-  filter(method == "Bayesian" | method == "HMM" | method == "HMM2")  #don't compare BCPA behavior
+  filter(method == "Bayesian" | method == "HMM")  #don't compare BCPA behavior
 
 p.coarse<- ggplot(summ.stats_coarse, aes(track_length, acc, fill = method, color = method)) +
   geom_boxplot() +
@@ -201,8 +240,8 @@ p.coarse<- ggplot(summ.stats_coarse, aes(track_length, acc, fill = method, color
                fun.data = function(x){c(y=median(x), ymin=median(x), ymax=median(x))}) +
   ylim(0,1) +
   labs(x="\nTrack Length (observations)", y = "Accuracy of Behavior Estimates\n") +
-  scale_fill_manual("", values = wes_palette("Zissou1")[c(1,3,5)]) +
-  scale_color_manual("", values = wes_palette("Zissou1")[c(1,3,5)]) +
+  scale_fill_manual("", values = wes_palette("Zissou1")[c(1,5)]) +
+  scale_color_manual("", values = wes_palette("Zissou1")[c(1,5)]) +
   theme_bw() +
   theme(panel.grid = element_blank(),
         axis.title = element_text(size = 16),
@@ -214,50 +253,50 @@ p.coarse<- ggplot(summ.stats_coarse, aes(track_length, acc, fill = method, color
 
 
 #Fine-scale behavior
-res %>% 
-  drop_na() %>% 
-  group_by(method, track_length, id) %>% 
-  filter(., behav_fine == state) %>% 
-  tally() %>% 
-  mutate(acc = n/track_length) %>% 
-  summarise(min=min(acc), max=max(acc), mean=mean(acc))
-
-summ.stats_fine<- res %>% 
-  drop_na() %>% 
-  group_by(method, track_length, id) %>% 
-  filter(., behav_fine == state) %>% 
-  tally() %>% 
-  mutate(acc = n/track_length) %>% 
-  ungroup()
-
-summ.stats_fine$track_length<- summ.stats_fine$track_length %>% 
-  factor(., levels = c('1000','5000','10000','50000'))
-summ.stats_fine<- summ.stats_fine %>% 
-  filter(method == "Bayesian" | method == "HMM" | method == "HMM2")  #don't compare BCPA behavior
-
-
-p.fine<- ggplot(summ.stats_fine, aes(track_length, acc, fill = method, color = method)) +
-  geom_boxplot() +
-  stat_summary(geom = "crossbar", width = 0.6, fatten=1.5, color="black",
-               position = position_dodge(0.75),
-               fun.data = function(x){c(y=median(x), ymin=median(x), ymax=median(x))}) +
-  ylim(0,1) +
-  labs(x="\nTrack Length (observations)", y = "Accuracy of Behavior Estimates\n") +
-  scale_fill_manual("", values = wes_palette("Zissou1")[c(1,3,5)]) +
-  scale_color_manual("", values = wes_palette("Zissou1")[c(1,3,5)]) +
-  theme_bw() +
-  theme(panel.grid = element_blank(),
-        axis.title = element_text(size = 16),
-        axis.text = element_text(size = 14),
-        legend.position = "n",
-        legend.text = element_text(size = 10))
+# res %>% 
+#   drop_na() %>% 
+#   group_by(method, track_length, id) %>% 
+#   filter(., behav_fine == state) %>% 
+#   tally() %>% 
+#   mutate(acc = n/track_length) %>% 
+#   summarise(min=min(acc), max=max(acc), mean=mean(acc))
+# 
+# summ.stats_fine<- res %>% 
+#   drop_na() %>% 
+#   group_by(method, track_length, id) %>% 
+#   filter(., behav_fine == state) %>% 
+#   tally() %>% 
+#   mutate(acc = n/track_length) %>% 
+#   ungroup()
+# 
+# summ.stats_fine$track_length<- summ.stats_fine$track_length %>% 
+#   factor(., levels = c('1000','5000','10000','50000'))
+# summ.stats_fine<- summ.stats_fine %>% 
+#   filter(method == "Bayesian" | method == "HMM" | method == "HMM2")  #don't compare BCPA behavior
+# 
+# 
+# p.fine<- ggplot(summ.stats_fine, aes(track_length, acc, fill = method, color = method)) +
+#   geom_boxplot() +
+#   stat_summary(geom = "crossbar", width = 0.6, fatten=1.5, color="black",
+#                position = position_dodge(0.75),
+#                fun.data = function(x){c(y=median(x), ymin=median(x), ymax=median(x))}) +
+#   ylim(0,1) +
+#   labs(x="\nTrack Length (observations)", y = "Accuracy of Behavior Estimates\n") +
+#   scale_fill_manual("", values = wes_palette("Zissou1")[c(1,3,5)]) +
+#   scale_color_manual("", values = wes_palette("Zissou1")[c(1,3,5)]) +
+#   theme_bw() +
+#   theme(panel.grid = element_blank(),
+#         axis.title = element_text(size = 16),
+#         axis.text = element_text(size = 14),
+#         legend.position = "n",
+#         legend.text = element_text(size = 10))
 
 
 
 plot_grid(NULL, NULL, NULL,
           p.time, NULL, p.brk,
           NULL, NULL, NULL,
-          p.coarse, NULL, p.fine,
+          p.coarse, NULL, NULL,
           align = "hv", nrow = 4, rel_widths = c(1,0.1,1), rel_heights = c(0.2,1,0.1,1))
 
 # ggsave("Figure 3 (method comparison).png", width = 12, height = 8, units = "in", dpi = 330)

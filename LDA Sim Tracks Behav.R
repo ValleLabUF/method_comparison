@@ -104,7 +104,11 @@ purrr::map(theta.estim, function(x) round(colSums(x)/nrow(x), digits = 3)) %>%
 behav.res<- purrr::map(res, get_behav_hist, nburn = nburn, ngibbs = ngibbs,
                        nmaxclust = nmaxclust, var.names = c("Step Length", "Turning Angle")) %>% 
   purrr::map(., function(x) x[x$behav <= 3,])  #only select the top 3 behaviors
+names(behav.res)<- names(dat.list)
+behav.res_exp<- bind_rows(behav.res, .id = "id")
 
+#export behav.res values
+# write.csv(behav.res_exp, "CRW MM LDA Phi values.csv", row.names = F)
 
 #Plot histograms of proportion data; order color scale from slow to fast
 par(ask=T)
@@ -169,6 +173,13 @@ behav.order<- list(c(3,1,2), c(1,3,2), c(2,1,3), c(2,3,1), c(2,3,1),
 #                    c(1,3,2), c(1,2,3), c(2,3,1), c(2,3,1), c(2,3,1))
 
 names(behav.order)<- names(theta.estim)
+
+behav.order_exp<- bind_rows(behav.order) %>% 
+  t() %>% 
+  data.frame() %>% 
+  mutate(id = names(behav.order))
+# write.csv(behav.order_exp, "CRW MM LDA behavior order.csv", row.names = F)
+
 
 
 #Change into long format

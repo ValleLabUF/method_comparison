@@ -145,3 +145,38 @@ ggplot(tracks[tracks$track_length == 1000,], aes(TA, color=behav_coarse)) +
 write.csv(tracks, "CRW_MM_sim_multinom.csv", row.names = F)
 write.csv(brkpts, "CRW_MM_sim_brkpts.csv", row.names = F)
 
+
+
+
+
+
+### Data for 'bayesmove' vignette ###
+
+set.seed(2)
+
+#simulate track
+ntseg<- 50
+nstep<- 100
+SL.params<- data.frame(shape=c(0.25, 2, 10), scale = c(1, 1, 1))
+TA.params<- data.frame(mu=c(pi, pi, 0), rho = c(0.8, 0, 0.8))
+
+track.sim<- CRW.sim(nsim=5, ntseg = ntseg, nstep = nstep, SL.params = SL.params,
+                    TA.params = TA.params, Z0=c(0,0))
+
+
+#extract tracks
+tracks<- track.sim$tracks %>%
+  modify_depth(2, ~modify_at(., "id", as.character)) %>%
+  modify_depth(1, ~map_dfr(., `[`)) %>%
+  map_dfr(`[`)
+
+
+tracks.list<- df_to_list(tracks, "id")
+tracks<- purrr::map(tracks.list, . %>% 
+                           dplyr::mutate(date = seq(c(ISOdate(2020, 7, 2, tz = "UTC")),
+                                                    by = "hour", length.out = 5001)) %>% 
+                           dplyr::mutate_at("date", function(x) x +
+                                            lubridate::seconds(runif(length(x), -120, 120)))) %>%
+  bind_rows() %>% 
+  dplyr::select(id, date, x, y)
+                                      

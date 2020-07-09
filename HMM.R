@@ -65,6 +65,35 @@ names(hmm.res_50k)<- names(move.d)[16:20]
 hmm.res<- c(hmm.res_1k, hmm.res_5k, hmm.res_10k, hmm.res_50k)
 
 
+
+### Extract param values from fitted HMMs
+
+hmm.params<- map(hmm.res, ~{map(.$models[2], getPar0) %>% 
+    map(., ~pluck(., "Par")) %>% 
+    flatten(.)
+})
+
+#step length params
+hmm.step.params<- map(hmm.params, ~pluck(., "step")[1:6]) %>% 
+  bind_rows() %>% 
+  t() %>% 
+  as.data.frame()
+names(hmm.step.params)<- c("mean_1","mean_2","mean_3","sd_1","sd_2","sd_3")
+
+#turning angle params
+hmm.angle.params<- map(hmm.params, ~pluck(., "angle")) %>% 
+  bind_rows() %>% 
+  t() %>% 
+  as.data.frame()
+names(hmm.angle.params)<- c("mean_1","mean_2","mean_3","concentration_1",
+                            "concentration_2","concentration_3")
+
+#save model params
+# write.csv(hmm.step.params, "HMM result gamma params.csv")
+# write.csv(hmm.angle.params, "HMM result wrapped Cauchy params.csv")
+
+
+
 #Compare elapsed times
 time<- map(hmm.res, . %>% pluck("elapsed.time")) %>% 
   map_dfr(., `[`) %>% 

@@ -179,4 +179,13 @@ tracks<- purrr::map(tracks.list, . %>%
                                             lubridate::seconds(runif(length(x), -120, 120)))) %>%
   bind_rows() %>% 
   dplyr::select(id, date, x, y)
-                                      
+
+#change IDs
+tracks<- tracks %>% 
+  mutate_at("id", ~case_when(str_detect(id, "1_") ~ "id1",
+                             str_detect(id, "2_") ~ "id2",
+                             str_detect(id, "3_") ~ "id3",
+                             str_detect(id, "4_") ~ "id4",
+                             str_detect(id, "5_") ~ "id5"))
+
+# usethis::use_data(tracks, overwrite = TRUE)

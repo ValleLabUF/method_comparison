@@ -1059,3 +1059,88 @@ legend.comp<- get_legend(p.gamma + theme(legend.position="bottom"))
 plot_grid(p.comp, legend.comp, ncol = 1, rel_heights = c(1, 0.1))
 
 # ggsave("Figure 5.png", width = 7, height = 6, units = "in", dpi = 330)
+
+
+
+
+
+
+
+
+
+
+
+
+
+### Extra figures for ESA presentation ###
+
+theta.estim_df<- theta.estim[[7]] %>% 
+  as.data.frame() %>% 
+  pivot_longer(., cols = 1:7, names_to = "behavior", values_to = "prop") %>% 
+  modify_at("behavior", factor)
+levels(theta.estim_df$behavior)<- 1:7
+
+ggplot(theta.estim_df, aes(behavior, prop)) +
+  geom_boxplot(fill = "grey35", alpha = 0.5, outlier.shape = NA) +
+  geom_jitter(color = "grey35", position = position_jitter(0.1), 
+              alpha = 0.3) +
+  # scale_color_brewer("", palette = "Dark2", guide = F) +
+  # scale_fill_brewer("", palette = "Dark2", guide = F) +
+  labs(x="\nBehavior", y="Proportion of Time Segment\n") +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        axis.title = element_text(size = 16),
+        axis.text = element_text(size = 14))
+
+# ggsave("Theta boxplot.png", width = 6, height = 4, units = "in", dpi = 330)
+
+
+
+
+
+
+qual_pal<- c(brewer.pal(9, "Set1"), brewer.pal(8, "Set2"), brewer.pal(8, "Dark2"),
+             brewer.pal(8, "Accent"), brewer.pal(12, "Paired"))
+qual_pal<- my.cols(44)
+
+library(RColorBrewer)
+qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
+col_vector = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
+
+
+
+ggplot(data = dat2_focal %>% slice(2:n()), aes(x,y)) +
+  geom_path(aes(color = factor(tseg)), size = 0.75) +
+  scale_color_manual(values = sample(qual_pal, 44)) +
+  # geom_point(fill = "grey45", pch = 21, size = 2.5, alpha = 0.7) +
+  geom_point(data = dat2_focal %>% slice(n=1), aes(x, y), color = "green", pch = 21, size = 3,
+             stroke = 1.25) +
+  geom_point(data = dat2_focal %>% slice(n()), aes(x, y), color = "red", pch = 24, size = 3,
+             stroke = 1.25) +
+  theme_void() +
+  theme(axis.title = element_blank(),
+        legend.position = "") +
+  coord_cartesian()
+
+# ggsave("Track segments.png", width = 6, height = 4, units = "in", dpi = 330)
+
+
+
+
+
+
+
+ggplot(data = dat2_focal %>% slice(2:n()), aes(x,y)) +
+  geom_path(aes(color = factor(behav_coarse), group = tseg), size = 0.75) +
+  scale_color_brewer("", palette = "Dark2", breaks = 1:3,
+                     labels = c("Encamped","ARS","Transit")) +
+  geom_point(data = dat2_focal %>% slice(n=1), aes(x, y), color = "green", pch = 21, size = 3,
+             stroke = 1.25) +
+  geom_point(data = dat2_focal %>% slice(n()), aes(x, y), color = "red", pch = 24, size = 3,
+             stroke = 1.25) +
+  theme_void() +
+  theme(axis.title = element_blank(),
+        legend.position = "") +
+  coord_cartesian()
+
+# ggsave("Track clustered.png", width = 6, height = 4, units = "in", dpi = 330)

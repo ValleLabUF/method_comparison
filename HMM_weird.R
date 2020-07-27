@@ -182,7 +182,7 @@ k.optim<- c(3, 3, 3, 3, 3,
             3, 3, 3, 3, 3)
 
 table(k.optim)/20
-# AIC suggested 4 sims w/ 4 states
+# AIC suggested 3 sims w/ 4 states
 # BIC suggested 4 sims w/ 4 states
 # holistic evaluation resulted in all sims using 3 states
 

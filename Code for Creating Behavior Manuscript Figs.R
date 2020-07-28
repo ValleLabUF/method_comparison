@@ -842,7 +842,7 @@ for (i in 1:length(behav.res_weird)) {
   }
   
   bayes.rmse_weird[[i]]<- data.frame(vec)
-  names(bayes.rmse_weird)[i]<- names(behav.res)[i]
+  names(bayes.rmse_weird)[i]<- names(behav.res_weird)[i]
 }
 bayes.rmse_weird<- bind_rows(bayes.rmse_weird) %>% 
   rename(value = vec) %>% 
@@ -872,7 +872,7 @@ for (i in 1:length(behav.res_weird)) {
   }
   
   hmm.rmse_weird[[i]]<- data.frame(vec)
-  names(hmm.rmse_weird)[i]<- names(behav.res)[i]
+  names(hmm.rmse_weird)[i]<- names(behav.res_weird)[i]
 }
 hmm.rmse_weird<- bind_rows(hmm.rmse_weird) %>% 
   rename(value = vec) %>% 
@@ -880,7 +880,7 @@ hmm.rmse_weird<- bind_rows(hmm.rmse_weird) %>%
 
 
 
-rmse.df_weird<- data.frame(id = rep(rep(names(behav.res), 2), each = 2),
+rmse.df_weird<- data.frame(id = rep(rep(names(behav.res_weird), 2), each = 2),
                      track_length = factor(rep(rep(rep(c(1000,5000,10000,50000),
                                                        each = 5), 2), each = 2),
                                            levels = c("1000","5000","10000","50000")),

@@ -17,8 +17,11 @@ set.seed(1)
 ### Prep Data ###
 #################
 
-d<- read.csv("CRW_MM_sim_multinom.csv", as.is = T)
-true.brkpts<- read.csv("CRW_MM_sim_brkpts.csv", as.is = T)
+# d<- read.csv("CRW_MM_sim_multinom.csv", as.is = T)
+# true.brkpts<- read.csv("CRW_MM_sim_brkpts.csv", as.is = T)
+
+d<- read.csv("CRW_MM_sim_weird.csv", as.is = T)
+true.brkpts<- read.csv("CRW_MM_sim_brkpts_weird.csv", as.is = T)
 
 d.list<- df.to.list(d, ind = "id")
 d.list<- map(d.list, ~mutate(., time = seq(c(ISOdate(2020,4,29)), by = "hour",
@@ -167,8 +170,8 @@ ggplot(time, aes(track_length, time)) +
 #export breakpoints for easier reference and elapsed time for method comparison
 names(all.brkpts)<- names(d.list)
 all.brkpts<- bind_rows(all.brkpts, .id = 'id')
-# write.csv(all.brkpts, "BCPA_allbrkpts.csv", row.names = F)
-# write.csv(time, "BCPA_elapsed_time.csv", row.names = F)  #units = min
+# write.csv(all.brkpts, "BCPA_allbrkpts_weird.csv", row.names = F)
+# write.csv(time, "BCPA_elapsed_time_weird.csv", row.names = F)  #units = min
 
 
 

@@ -13,23 +13,23 @@ source('helper functions.R')
 
 
 # Load elapsed time
-seg.time<- read.csv("Bayesian_elapsed_time.csv")
-lda.time<- read.csv("LDA_elapsed_time.csv")
-bcpa.time<- read.csv("BCPA_elapsed_time.csv")
-hmm.time<- read.csv("HMM_elapsed_time.csv")
+seg.time<- read.csv("Bayesian_elapsed_time_weird.csv")
+lda.time<- read.csv("LDA_elapsed_time_weird.csv")
+bcpa.time<- read.csv("BCPA_elapsed_time_weird.csv")
+hmm.time<- read.csv("HMM_elapsed_time_weird.csv")
 
 # Load breakpoints
-bayes.brkpts<- read.csv("Bayesian_allbreakpts.csv")
-bcpa.brkpts<- read.csv("BCPA_allbrkpts.csv")
+bayes.brkpts<- read.csv("Bayesian_allbreakpts_weird.csv")
+bcpa.brkpts<- read.csv("BCPA_allbrkpts_weird.csv")
 
 # Load results
-bayes.res<- read.csv("Modeled MM Sim Tracks w Behav.csv")
-hmm.res<- read.csv("HMM results.csv")
+# bayes.res<- read.csv("Modeled MM Sim Tracks w Behav.csv")
+# hmm.res<- read.csv("HMM results.csv")
 bayes.res_weird<- read.csv("Modeled MM Sim Tracks w Behav_weird.csv")
 hmm.res_weird<- read.csv("HMM results_weird.csv")
 
 # Load true breakpoints
-true.brkpts<- read.csv("CRW_MM_sim_brkpts.csv", as.is = T)
+# true.brkpts<- read.csv("CRW_MM_sim_brkpts.csv", as.is = T)
 true.brkpts_weird<- read.csv("CRW_MM_sim_brkpts_weird.csv", as.is = T)
 
 # Load helper functions
@@ -133,7 +133,7 @@ brkpt.acc %>%
   group_by(method, track_length) %>% 
   summarise(mean=mean(freq))
 
-# number of breakpoints mirmsed
+# number of breakpoints missed
 all.brkpts %>% 
   filter(acc == "Missing") %>% 
   group_by(method) %>% 
@@ -655,10 +655,10 @@ p.rmse_weird<- ggplot(rmse.df_weird, aes(track_length, rmse, fill = method, colo
 
 plot_grid(NULL, NULL, NULL,
           p.time, NULL, p.brk,
-          NULL, NULL, NULL,
-          p.coarse, NULL, p.rmse,
+          # NULL, NULL, NULL,
+          # p.coarse, NULL, p.rmse,
           NULL, NULL, NULL,
           p.coarse_weird, NULL, p.rmse_weird,
-          align = "hv", nrow = 6, rel_widths = c(1,0.1,1), rel_heights = c(0.2,1,0.1,1,0.1,1))
+          align = "hv", nrow = 4, rel_widths = c(1,0.1,1), rel_heights = c(0.2,1,0.1,1))
 
 # ggsave("Figure 3 (method comparison).png", width = 12, height = 12, units = "in", dpi = 330)

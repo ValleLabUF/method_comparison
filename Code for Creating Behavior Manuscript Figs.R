@@ -291,35 +291,35 @@ setwd("~/Documents/Manuscripts/Bayesian Behavior Estimation Model/Figures")
 
 
 ## Part a: segmentation heatmap
-data<- behav.list2$`2_2`  #ID 2_2
+data<- behav.list2$`2_3`  #ID 2_3
 nbins<- c(5,8)
 behav.heat<- behav.seg.image(data, nbins)
 
 SL<- data.frame(behav.heat$SL)
 names(SL)<- 1:nbins[1]
-SL<- SL %>% gather(key, value) %>% mutate(time=rep(behav.list[["2_2"]]$time1, times=nbins[1]),
+SL<- SL %>% gather(key, value) %>% mutate(time=rep(behav.list[["2_3"]]$time1, times=nbins[1]),
                                           behav=rep("Step Length", nrow(data)*nbins[1]))
 
 TA<- data.frame(behav.heat$TA)
 names(TA)<- 1:nbins[2]
-TA<- TA %>% gather(key, value) %>% mutate(time=rep(behav.list[["2_2"]]$time1, times=nbins[2]),
+TA<- TA %>% gather(key, value) %>% mutate(time=rep(behav.list[["2_3"]]$time1, times=nbins[2]),
                                           behav=rep("Turning Angle", nrow(data)*nbins[2]))
 
 behav.heat_long<- rbind(SL,TA)
 behav.heat_long$value<- factor(behav.heat_long$value)
-levels(behav.heat_long$value)<- c("Unoccupied","Occupied")
+levels(behav.heat_long$value)<- c("Unused","Used")
 
 breakpt<- bayes.brkpts %>% 
   filter(id == unique(data$id) & type == "Model") %>% 
   dplyr::select(brks) %>% 
   rename(breaks = brks)
 
-true.brks<- data.frame(t(true.brkpts[7,-1])) %>%
+true.brks<- data.frame(t(true.brkpts[12,-1])) %>%
   drop_na() %>% 
-  rename(breaks = X7) %>% 
+  rename(breaks = X12) %>% 
   pull(breaks)
 
-ticks.bottom<-data.frame(x=true.brks, y=0.5, xend=true.brks, yend=1.5)
+ticks.bottom<- data.frame(x=true.brks, y=0.5, xend=true.brks, yend=1.5)
 ticks.top<- data.frame(x=rep(true.brks, 2), y=NA, xend=rep(true.brks, 2), yend=NA)
 # ticks.top$y<- rep(c(4.5,7.5), each = length(true.brks))
 # ticks.top$yend<- rep(c(5.5,8.5), each = length(true.brks))
@@ -334,7 +334,7 @@ p.seg<- ggplot(behav.heat_long, aes(x=time#, y=key
   facet_wrap(~behav, scales = 'free', nrow = 2) +
   scale_fill_viridis_d('') +
   scale_y_discrete(expand = c(0,0)) +
-  scale_x_continuous(expand = c(0,0)) +
+  # scale_x_continuous(labels = c(0, 2500, 5000, 7500, 10000)) +
   geom_vline(data = breakpt, aes(xintercept = breaks - 0.5), color = viridis(n=9)[7],
              size = 1, alpha = 1) +
   geom_segment(data = ticks.top, aes(x = x, xend = xend, y = y, yend = yend#, group = behav
@@ -364,13 +364,14 @@ p.seg<- ggplot(behav.heat_long, aes(x=time#, y=key
 library(circular)
 
 #calculate true proportions of SL and TA by behavior for all bins for ID 2_2
-SL.params<- data.frame(par1 = c(0.25, 2, 10), par2 = c(1, 1, 1))
+SL.params_weird<- data.frame(par1 = c(0.25, 2, exp(2)), par2 = c(1, 2, exp(3)))
 TA.params<- data.frame(par1 = c(pi, pi, 0), par2 = c(0.8, 0, 0.8))
-true.b<- extract.behav.props(params = list(SL.params, TA.params),
-                             lims = list(dist.bin.lims,angle.bin.lims),
-                             behav.names = c("Encamped","ARS","Transit"))
 
-bayes.b<- behav.res[[7]] %>% rename(., var = param)
+true.b_weird<- extract.behav.props_weird(params = list(SL.params_weird, TA.params),
+                                         lims = list(dist.bin.lims, angle.bin.lims),
+                                         behav.names = c("Encamped","ARS","Transit"))
+
+bayes.b<- behav.res[[12]] %>% rename(., var = param)
 bayes.b$behav<- bayes.b$behav %>% 
   as.character() %>% 
   str_replace_all(., "1", "ARS") %>% 
@@ -380,7 +381,7 @@ bayes.b$behav<- bayes.b$behav %>%
   
 
 
-p.hist<- ggplot(true.b, aes(x = bin, y = prop, fill = behav)) +
+p.hist<- ggplot(true.b_weird, aes(x = bin, y = prop, fill = behav)) +
   geom_bar(stat = 'identity') +
   geom_point(data = bayes.b, aes(x=bin, y=prop, group = behav), pch=21, size = 2, fill="white",
              color="black", stroke=1) +
@@ -401,7 +402,7 @@ p.hist<- ggplot(true.b, aes(x = bin, y = prop, fill = behav)) +
 
 
 ##Part c: generate time series plots comparing behavior proportions
-dat1<- theta.estim.long[[7]]
+dat1<- theta.estim.long[[12]]
 dat1$behavior<- dat1$behavior %>% 
   as.character() %>% 
   str_replace_all(., "1", "Encamped") %>% 
@@ -409,7 +410,7 @@ dat1$behavior<- dat1$behavior %>%
   str_replace_all(., "3", "Transit") %>% 
   factor(., levels = c("Encamped","ARS","Transit"))
 
-bayes.list<- df.to.list(bayes.res, "id")
+bayes.list<- df.to.list(bayes.res_weird, "id")
 true.behavior.long<- list()
 for (i in 1:length(bayes.list)) {
   true.behavior.long[[i]]<- data.frame(true.tseg = rep(1:(bayes.list[[i]]$track_length[1]/100),
@@ -447,7 +448,7 @@ for (i in 1:length(bayes.list)) {
 }
 names(true.behavior.long)<- names(bayes.list)
 
-true.dat1<- true.behavior.long[[7]]
+true.dat1<- true.behavior.long[[12]]
 true.dat1$behavior<- true.dat1$behavior %>% 
   as.character() %>% 
   str_replace_all(., "1", "Encamped") %>% 
@@ -456,14 +457,14 @@ true.dat1$behavior<- true.dat1$behavior %>%
   factor(., levels = c("Encamped","ARS","Transit"))
 
 p.prop<- ggplot() +
-  geom_line(data = dat1,
-            aes(x=date, y=prop, color = behavior),
-            size = 1.5) +
+  geom_path(data = true.dat1,
+            aes(x=time1, y=prop, color = behavior),
+            size = 1.5, linejoin = "round", lineend = "round") +
   scale_color_manual(values = c(viridis(n=20)[c(1,9)], "gold3"), guide=F) +
   new_scale_color() +
-  geom_line(data = true.dat1,
-            aes(x=time1, y=prop, color = behavior),
-            size = 0.75) +
+  geom_path(data = dat1,
+            aes(x=date, y=prop, color = behavior),
+            size = 0.75, linejoin = "round", lineend = "round") +
   scale_color_manual(values = c(viridis(n=20)[c(7,13)], "gold2"), guide=F) +
   labs(x = "\nTime", y = "Proportion of Behavior\n") +
   theme_bw() +

@@ -902,7 +902,7 @@ p.rmse_weird<- ggplot(rmse.df_weird, aes(track_length, rmse.value, fill = method
   theme(panel.grid = element_blank(),
         axis.title = element_text(size = 16),
         axis.text = element_text(size = 14),
-        legend.position = "n",
+        legend.position = c(0.9,0.85),
         legend.text = element_text(size = 14),
         strip.text = element_text(size = 14, face = "bold")) +
   facet_wrap(~rmse.var, ncol = 2)
@@ -914,14 +914,20 @@ p.rmse_weird<- ggplot(rmse.df_weird, aes(track_length, rmse.value, fill = method
 library(gridExtra)
 setwd("~/Documents/Manuscripts/Bayesian Behavior Estimation Model/Figures")
 
-png("Figure S1 (rmse from sim).png", width = 14.7, height = 10.5, units = "in", res = 330)
-grid.arrange(p.gamWC, p.rmse, p.normWC, p.rmse_weird, heights = c(0.2, 1, 0.1, 1),
-             widths = c(1, 0.2, 0.2, 0.2, 1, 0.1),
-             layout_matrix = rbind(c(NA, NA, NA, NA, NA, NA),
-                                   c(1, NA, 2, 2, 2, NA),
-                                   c(NA, NA, NA, NA, NA, NA),
-                                   c(3, NA, 4, 4, 4, NA)))
-dev.off()
+# png("Figure S1 (rmse from sim).png", width = 14.5, height = 5.5, units = "in", res = 330)
+
+# grid.arrange(p.gamWC, p.rmse, p.normWC, p.rmse_weird, heights = c(0.2, 1, 0.1, 1),
+#              widths = c(1, 0.2, 0.2, 0.2, 1, 0.1),
+#              layout_matrix = rbind(c(NA, NA, NA, NA, NA, NA),
+#                                    c(1, NA, 2, 2, 2, NA),
+#                                    c(NA, NA, NA, NA, NA, NA),
+#                                    c(3, NA, 4, 4, 4, NA)))
+
+grid.arrange(p.normWC, p.rmse_weird, heights = c(0.2, 1),
+             widths = c(1, 0.2, 1, 0.5),
+             layout_matrix = rbind(c(NA, NA, NA, NA),
+                                   c(3, NA, 4, 4)))
+# dev.off()
 
 
 

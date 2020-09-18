@@ -309,3 +309,226 @@ ggplot(time, aes(track_length, time)) +
 #export results
 # write.csv(dat2, "Modeled MM Sim Tracks w Behav_weird.csv", row.names = F)  #for mixed-membership sim
 # write.csv(time, "LDA_elapsed_time_weird.csv", row.names = F)  #units = min
+
+
+
+
+
+##################
+#### Figure 4 ####
+##################
+
+# Load breakpoints
+bayes.brkpts<- read.csv("Bayesian_allbreakpts_weird.csv")
+true.brkpts_weird<- read.csv("CRW_MM_sim_brkpts_weird.csv")
+
+
+## Part a: segmentation heatmap
+data<- dat.list$`2_3`[,c("id","SL","TA")]  #ID 2_3
+nbins<- c(5,8)
+
+## Function to transform bin numbers into binary matrix for heatmap
+behav.seg.image=function(dat, nbins) {  #Transform single var vectors into pres/abs matrices for                                         #heatmap; nbins is vector of bins per param in order
+  dat<- dat[,-1]  #remove id col
+  behav.list<- map2(list(dat), nbins, ~matrix(0, nrow = nrow(.x), ncol = .y))
+  for (i in 1:length(behav.list)) {
+    for (j in 1:nrow(dat)){
+      behav.list[[i]][j,dat[,i][j]]=1
+    }
+  }
+  
+  names(behav.list)<- names(dat)
+  behav.list
+}
+
+
+behav.heat<- behav.seg.image(data, nbins)
+
+
+SL<- data.frame(behav.heat$SL)
+names(SL)<- 1:nbins[1]
+SL<- SL %>% gather(key, value) %>% mutate(time=rep(dat.list[["2_3"]]$time1, times=nbins[1]),
+                                          behav=rep("Step Length", nrow(data)*nbins[1]))
+
+TA<- data.frame(behav.heat$TA)
+names(TA)<- 1:nbins[2]
+TA<- TA %>% gather(key, value) %>% mutate(time=rep(dat.list[["2_3"]]$time1, times=nbins[2]),
+                                          behav=rep("Turning Angle", nrow(data)*nbins[2]))
+
+behav.heat_long<- rbind(SL,TA)
+behav.heat_long$value<- factor(behav.heat_long$value)
+levels(behav.heat_long$value)<- c("Unused","Used")
+
+breakpt<- bayes.brkpts %>% 
+  filter(id == unique(data$id) & type == "Model") %>% 
+  dplyr::select(brks) %>% 
+  rename(breaks = brks)
+
+true.brks<- data.frame(t(true.brkpts_weird[12,-1])) %>%
+  drop_na() %>% 
+  rename(breaks = X12) %>% 
+  pull(breaks)
+
+ticks.bottom<- data.frame(x=true.brks, y=0.5, xend=true.brks, yend=1.5)
+ticks.top<- data.frame(x=rep(true.brks, 2), y=NA, xend=rep(true.brks, 2), yend=NA)
+ticks.top$y<- rep(7.5, length(true.brks))
+ticks.top$yend<- rep(8.5, length(true.brks))
+ticks.top$behav<- rep(c("Step Length","Turning Angle"), each = length(true.brks))
+
+
+p.seg<- ggplot(behav.heat_long, aes(x=time)) +
+  facet_wrap(~behav, scales = 'free', nrow = 2) +
+  scale_fill_viridis_d('') +
+  scale_y_discrete(expand = c(0,0)) +
+  geom_vline(data = breakpt, aes(xintercept = breaks - 0.5), color = viridis(n=9)[7],
+             size = 1, alpha = 1) +
+  geom_segment(data = ticks.top, aes(x = x, xend = xend, y = y, yend = yend),
+               color = "black", size = 1, alpha = 1) +
+  geom_segment(data = ticks.bottom, aes(x = x, xend = xend, y = y, yend = yend), color = "black",
+               size = 1, alpha = 1) +
+  labs(x = "\nTime", y = "\n") +
+  theme_bw() +
+  theme(axis.title = element_text(size = 16),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        strip.text = element_text(size = 12, face = 'bold'),
+        plot.title = element_text(size = 20, hjust = 0, vjust = -6),
+        plot.margin = margin(0, 1, 0.5, 0.5, "cm"),
+        panel.grid = element_blank(),
+        legend.justification = "right",
+        legend.position = "top",
+        legend.text = element_text(
+          margin = margin(r = 15, unit = "pt")))
+
+
+
+
+## Part b: behavior histogram
+library(circular)
+source('helper functions.R')
+
+#calculate true proportions of SL and TA by behavior for all bins for ID 2_2
+SL.params_weird<- data.frame(par1 = c(0.25, 2, exp(2)), par2 = c(1, 2, exp(3)))
+TA.params<- data.frame(par1 = c(0.5, -pi, 0), par2 = c(0.5, pi, 1))
+
+true.b_weird<- extract.behav.props_weird(params = list(SL.params_weird, TA.params),
+                                         lims = list(dist.bin.lims, angle.bin.lims),
+                                         behav.names = c("Encamped","ARS","Transit"))
+
+bayes.b<- behav.res[[12]]
+bayes.b$behav<- bayes.b$behav %>% 
+  as.character() %>% 
+  str_replace_all(., "1", "ARS") %>% 
+  str_replace_all(., "2", "Encamped") %>%
+  str_replace_all(., "3", "Transit") %>%
+  factor(., levels = c("Encamped","ARS","Transit"))
+
+
+
+p.hist<- ggplot(true.b_weird, aes(x = bin, y = prop, fill = behav)) +
+  geom_bar(stat = 'identity') +
+  geom_point(data = bayes.b, aes(x=bin, y=prop, group = behav), pch=21, size = 2, fill="white",
+             color="black", stroke=1) +
+  labs(x = "\nBin", y = "Proportion\n") +
+  theme_bw() +
+  theme(axis.title = element_text(size = 16),
+        axis.text.y = element_text(size = 14),
+        axis.text.x.bottom = element_text(size = 12),
+        strip.text = element_text(size = 14),
+        strip.text.x = element_text(face = "bold"),
+        panel.grid = element_blank()) +
+  scale_fill_manual(values = viridis(n=3), guide = F) +
+  scale_y_continuous(breaks = c(0.00, 0.50, 1.00), limits = c(0,1)) +
+  scale_x_continuous(breaks = 1:8) +
+  facet_grid(behav ~ var, scales = "free_x")
+
+
+
+
+##Part c: generate time series plots comparing behavior proportions
+dat1<- theta.estim.long[[12]]
+dat1$behavior<- dat1$behavior %>% 
+  as.character() %>% 
+  str_replace_all(., "1", "Encamped") %>% 
+  str_replace_all(., "2", "ARS") %>% 
+  str_replace_all(., "3", "Transit") %>% 
+  factor(., levels = c("Encamped","ARS","Transit"))
+
+bayes.list<- df_to_list(dat2, "id")
+true.behavior.long<- list()
+for (i in 1:length(bayes.list)) {
+  true.behavior.long[[i]]<- data.frame(true.tseg = rep(1:(bayes.list[[i]]$track_length[1]/100),
+                                                       each = 300),
+                                       behav_coarse = rep(bayes.list[[i]]$behav_coarse,
+                                                          each = 3),
+                                       behav_fine = rep(bayes.list[[i]]$behav_fine,
+                                                        each = 3),
+                                       behavior = rep(1:3, 1000),
+                                       time1 = rep(1:(bayes.list[[i]]$track_length[1]),each = 3))
+  
+  true.behavior.long[[i]]$prop<- 0.1
+  
+  cond<- true.behavior.long[[i]][,"behav_coarse"]
+  ind<- which(true.behavior.long[[i]][,"behavior"] == cond)
+  
+  true.behavior.long[[i]][ind,"prop"]<- 0.8
+  
+  #add 0 or 1 for pure segments
+  ind1<- true.behavior.long[[i]] %>% 
+    drop_na() %>% 
+    group_by(true.tseg, behav_fine) %>% 
+    tally() %>% 
+    mutate(prop.true = n/sum(n))
+  
+  ind2<- ind1[which(ind1$prop.true == 1),]
+  
+  for (j in 1:nrow(ind2)) {
+    cond2<- which(true.behavior.long[[i]]$true.tseg == as.numeric(ind2[j,"true.tseg"]))
+    true.behavior.long[[i]][cond2, "prop"]<- true.behavior.long[[i]][cond2,] %>% 
+      mutate_at("prop", ~case_when(behavior == as.numeric(ind2[j,"behav_fine"]) ~ 1,
+                                   behavior != as.numeric(ind2[j,"behav_fine"]) ~ 0)) %>% 
+      dplyr::pull(prop)
+  }
+}
+names(true.behavior.long)<- names(bayes.list)
+
+true.dat1<- true.behavior.long[[12]]
+true.dat1$behavior<- true.dat1$behavior %>% 
+  as.character() %>% 
+  str_replace_all(., "1", "Encamped") %>% 
+  str_replace_all(., "2", "ARS") %>% 
+  str_replace_all(., "3", "Transit") %>% 
+  factor(., levels = c("Encamped","ARS","Transit"))
+
+p.prop<- ggplot() +
+  geom_path(data = true.dat1,
+            aes(x=time1, y=prop, color = behavior),
+            size = 1.5, linejoin = "round", lineend = "round") +
+  scale_color_manual(values = c(viridis(n=20)[c(1,9)], "gold3"), guide=F) +
+  new_scale_color() +
+  geom_path(data = dat1,
+            aes(x=time1-1, y=prop, color = behavior),
+            size = 0.75, linejoin = "round", lineend = "round") +
+  scale_color_manual(values = c(viridis(n=20)[c(7,13)], "gold2"), guide=F) +
+  labs(x = "\nTime", y = "Proportion of Behavior\n") +
+  theme_bw() +
+  theme(axis.title = element_text(size = 16),
+        axis.text = element_text(size = 14),
+        strip.text = element_text(size = 12, face = "bold")) +
+  scale_y_continuous(breaks = c(0, 0.5, 1), limits = c(0,1)) +
+  facet_wrap(~behavior, nrow = 3)
+
+
+
+
+## Make composite
+library(gridExtra)
+
+# png("Figure 4 (results from sim).png", width = 14, height = 10, units = "in", res = 330)
+grid.arrange(p.seg, p.hist, p.prop, heights = c(0.2, 1, 0.1, 1),
+             layout_matrix = rbind(c(NA, NA),
+                                   c(1, 2),
+                                   c(NA, NA),
+                                   c(3, 3)))
+# dev.off()

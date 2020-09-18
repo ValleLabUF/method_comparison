@@ -446,7 +446,7 @@ hmm.res_weird3<- hmm.res_weird %>%
   df.to.list("id") %>% 
   map2(.,
        df.to.list(hmm.res_weird2, "id") %>% map(., ~rbind(c(unique(.$id), rep(NA, 7)), .)),
-       ~cbind(.x, .y)) %>% 
+       ~cbind(.x, .y[,-1])) %>% 
   bind_rows()
 
 
@@ -630,6 +630,10 @@ rmse.df_weird<- data.frame(id = rep(unique(as.character(hmm.res_weird$id)), 2),
                     rmse = c(bayes.rmse_weird, hmm.rmse_weird),
                     method = rep(c("Bayesian","HMM"), each = 20))
 
+#summarize results
+rmse.df_weird %>% 
+  group_by(method, track_length) %>% 
+  summarise(mean=mean(rmse))
 
 
 #Plot results

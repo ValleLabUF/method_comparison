@@ -143,10 +143,10 @@ extract.behav.props=function(params, lims, behav.names){
 #--------------------------------------
 
 extract.behav.props_weird=function(params, lims, behav.names){  
-  #only for truncated normal and wrapped Cauchy distributions only defined for
-  #step lengths ('dist') and turning angles ('rel.angle') params must be alist
-  #of data frames storing 2 cols for the params of the truncated normal and
-  #wrapped cauchy distributions lims must be a list of numeric vectors
+  #only for truncated normal and mixed distributions (beta, uniform, truncated normal);
+  #step lengths ('dist') and turning angles ('rel.angle') params must be a list
+  #of data frames storing 2 cols for the params of each distribution; lims must be a list
+  #of numeric vectors
   
   #number of bins for both params are already defined as 5 (SL) and 8 (TA)
   #order of states is set as encamped, ARS, transit
@@ -191,23 +191,67 @@ extract.behav.props_weird=function(params, lims, behav.names){
   TA<- params[[2]]  #extract TA params from argument; must be second
   angle.bin.lims<- lims[[2]]  #extract limits for TA from argument; must be second
   
-  for (j in 1:nrow(TA)) {
-    mu1=circular(TA[j,1],type='angles',units='radians')
-    rho1=TA[j,2]
-    
-    bins.estim=rep(NA,(length(angle.bin.lims) - 1))
-    
-    for (i in 2:length(angle.bin.lims)) {
-      pwrappedcauchy=integrate(dwrappedcauchy,
-                               angle.bin.lims[i-1],
-                               angle.bin.lims[i],
-                               mu=mu1,
-                               rho=rho1)
-      bins.estim[i-1]=pwrappedcauchy$value
+  
+  #Encamped state (beta distrib)
+  a=TA[1,1]
+  b=TA[1,2]
+  
+  bins.estim=rep(NA,(length(angle.bin.lims) - 1))
+  
+  for (i in 2:length(angle.bin.lims)) {
+    if (i-1 == 1) {
+      bins.estim[i-1]=pbeta((angle.bin.lims[i]+pi)/(2*pi),shape1=a,shape2=b) - 
+        pbeta(0,shape1=a,shape2=b)
+    } else {
+      bins.estim[i-1]=pbeta((angle.bin.lims[i]+pi)/(2*pi),shape1=a,shape2=b)-
+        pbeta((angle.bin.lims[i-1]+pi)/(2*pi),shape1=a,shape2=b)
     }
-    
-    props.TA[[j]]<- bins.estim
   }
+  
+  props.TA[[1]]<- bins.estim
+  
+  
+  
+  #ARS state (uniform distrib)
+  lo=TA[2,1]
+  up=TA[2,2]
+  
+  bins.estim=rep(NA,(length(angle.bin.lims) - 1))
+  
+  for (i in 2:length(angle.bin.lims)) {
+    if (i-1 == 1) {
+      bins.estim[i-1]=punif(angle.bin.lims[i],min=lo,max=up) - 
+        punif(-pi,min=lo,max=up)
+    } else {
+      bins.estim[i-1]=punif(angle.bin.lims[i],min=lo,max=up)-
+        punif(angle.bin.lims[i-1],min=lo,max=up)
+    }
+  }
+  
+  props.TA[[2]]<- bins.estim
+  
+  
+  
+  #Transit state (truncated normal distrib)
+  mean1=TA[3,1]
+  sd1=TA[3,2]
+  
+  bins.estim=rep(NA,(length(angle.bin.lims) - 1))
+  
+  for (i in 2:length(angle.bin.lims)) {
+    if (i-1 == 1) {
+      bins.estim[i-1]=pnorm(angle.bin.lims[i],mean=mean1,sd=sd1) - 
+        pnorm(-pi,mean=mean1,sd=sd1)
+    } else {
+      bins.estim[i-1]=pnorm(angle.bin.lims[i],mean=mean1,sd=sd1)-
+        pnorm(angle.bin.lims[i-1],mean=mean1,sd=sd1)
+    }
+  }
+  
+  props.TA[[3]]<- bins.estim
+  
+  
+  
   
   names(props.TA)<- behav.names
   props.TA1<- props.TA %>% 

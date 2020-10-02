@@ -103,7 +103,7 @@ all.brkpts<- list()
 for (i in 1:length(cp)) {
   all.brkpts[[i]]<- brkpt.accuracy(model.brkpts = round(cp[[i]]$breaks$middle, 0),
                                    true.brkpts = true.brkpts[i,-1],
-                                   acc.tol = 20, dup.tol = 20, miss.tol = 50)
+                                   acc.tol = 10, dup.tol = 0, miss.tol = 30)
 }
 
 

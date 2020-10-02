@@ -53,7 +53,10 @@ time$track_length<- time$track_length %>%
 
 p.time<- ggplot(time, aes(track_length, time, fill = method, color = method)) +
   geom_boxplot() +
-  stat_summary(geom = "crossbar", width = 0.6, fatten=1.5, color="black",
+  # stat_summary(geom = "crossbar", width = 0.6, fatten=1.5, color="black",
+  #              position = position_dodge(0.75),
+  #              fun.data = function(x){c(y=median(x), ymin=median(x), ymax=median(x))}) +
+  stat_summary(geom = "point", shape = 15, color="black",
                position = position_dodge(0.75),
                fun.data = function(x){c(y=median(x), ymin=median(x), ymax=median(x))}) +
   labs(x="", y = "Elapsed Time (min)\n") +
@@ -112,7 +115,7 @@ brkpt.acc$track_length<- brkpt.acc$track_length %>%
   factor(., levels = c('1000','5000','10000','50000'))
 
 
-#Accuracy (includes 'accurate' and 'accurate duplicate' classifications)
+#Accuracy 
 p.brk<- ggplot(brkpt.acc, aes(track_length, freq, fill = method, color = method)) +
   geom_boxplot() +
   stat_summary(geom = "crossbar", width = 0.6, fatten=1.5, color="black",

@@ -160,10 +160,26 @@ plot.heatmap(data = behav.list2, nbins = c(5,8), brkpts = brkpts, type = "behav"
 
 
 # Compare True vs Modeled Breakpoints
+
+#If need to recalculate, import data and reformat
+# bayes.brkpts<- read.csv("Bayesian_allbreakpts_weird.csv")
+# brkpts<- bayes.brkpts %>% 
+#   filter(type == "Model") %>% 
+#   group_by(id) %>% 
+#   mutate(key = row_number()) %>% 
+#   pivot_wider(id_cols = id, names_from = key, values_from = brks) %>% 
+#   ungroup()
+# true.brkpts<- bayes.brkpts %>% 
+#   filter(type == "True") %>% 
+#   group_by(id) %>% 
+#   mutate(key = row_number()) %>% 
+#   pivot_wider(id_cols = id, names_from = key, values_from = brks) %>% 
+#   ungroup()
+
 all.brkpts<- list()
 for (i in 1:nrow(brkpts)) {
 all.brkpts[[i]]<- brkpt.accuracy(model.brkpts = brkpts[i,-1], true.brkpts = true.brkpts[i,-1],
-                            acc.tol = 20, dup.tol = 20, miss.tol = 50)
+                            acc.tol = 10, dup.tol = 0, miss.tol = 30)
 }
 
 
